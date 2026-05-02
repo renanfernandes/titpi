@@ -1,0 +1,16 @@
+[Unit]
+Description=TitPi Bird Watcher
+After=network.target
+
+[Service]
+Type=simple
+User=titpi
+WorkingDirectory=/home/titpi/titpi
+ExecStart=/usr/bin/python3 /home/titpi/titpi/watcher.py --debug
+Restart=on-failure
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=TitPi Bird of the Day — daily 7pm timer
+
+[Timer]
+OnCalendar=*-*-* 19:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

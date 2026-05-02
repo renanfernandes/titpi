@@ -1,0 +1,16 @@
+[Unit]
+Description=TitPi Bird Feeder Dashboard
+After=network.target titpi.service
+
+[Service]
+Type=simple
+User=titpi
+WorkingDirectory=/home/titpi/titpi
+ExecStart=/usr/bin/python3 /home/titpi/titpi/web.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

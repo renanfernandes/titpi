@@ -1,0 +1,31 @@
+{
+    "camera": {
+        "model_path": "/usr/share/imx500-models/imx500_network_efficientdet_lite0_pp.rpk",
+        "confidence_threshold": 0.55,
+        "confirmation_frames": 3,
+        "photo_delay": 1.5,
+        "video_min_duration": 10,
+        "video_max_duration": 120,
+        "video_idle_timeout": 5,
+        "photo_interval": 3,
+        "cooldown": 15,
+        "save_directory": "/home/titpi/titpi/detections",
+        "target_labels": ["bird", "person", "dog"]
+    },
+    "email": {
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 587,
+        "from": "",
+        "password": "",
+        "to": ""
+    },
+    "local_classifier": {
+        "enabled": true,
+        "min_confidence": 0.3
+    },
+    "github": {
+        "token": "",
+        "model": "",
+        "identify_all": true
+    }
+}

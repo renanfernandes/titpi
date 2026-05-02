@@ -1,0 +1,11 @@
+[Unit]
+Description=TitPi Bird of the Day compute
+After=titpi.service
+
+[Service]
+Type=oneshot
+User=titpi
+WorkingDirectory=/home/titpi/titpi
+ExecStart=/usr/bin/python3 /home/titpi/titpi/compute_botd.py
+StandardOutput=journal
+StandardError=journal
