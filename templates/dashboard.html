@@ -49,6 +49,16 @@
   #edit-modal h6 { color:#7ec8e3; margin-bottom:1rem; }
   #edit-modal input { background:#0f1117; border:1px solid #3a3d4a; color:#e0e0e0; border-radius:6px; padding:.4rem .7rem; width:100%; margin-bottom:.75rem; }
   #edit-modal input:focus { outline:none; border-color:#7ec8e3; }
+  /* Multi-select */
+  .det-check { width:16px; height:16px; accent-color:#7ec8e3; cursor:pointer; }
+  #bulk-bar { display:none; position:fixed; bottom:0; left:0; right:0; background:#1a1d27; border-top:2px solid #7ec8e3; padding:.75rem 1.5rem; z-index:9000; align-items:center; justify-content:space-between; gap:1rem; }
+  #bulk-bar.open { display:flex; }
+  #bulk-bar .bulk-count { color:#7ec8e3; font-weight:600; font-size:.95rem; }
+  #bulk-bar button { border-radius:6px; padding:.35rem 1rem; font-size:.85rem; border:none; cursor:pointer; }
+  #bulk-bar .btn-bulk-edit { background:#2a4a3a; color:#7ec8aa; }
+  #bulk-bar .btn-bulk-edit:hover { background:#3a5a4a; }
+  #bulk-bar .btn-bulk-cancel { background:#2a2d3a; color:#aaa; }
+  #bulk-bar .btn-bulk-cancel:hover { background:#3a3d4a; }
 </style>
 </head>
 <body>
@@ -139,6 +149,7 @@
     <div class="table-responsive">
     <table class="table table-sm">
       <thead><tr>
+        <th style="width:30px"><input type="checkbox" class="det-check" id="select-all" onchange="toggleSelectAll(this)"></th>
         <th></th><th>Time</th><th>Species</th><th>Confidence</th>
         <th>Score</th><th>Duration</th><th>Video</th><th></th>
       </tr></thead>
@@ -149,10 +160,20 @@
 
 </div>
 
+<!-- Bulk action bar -->
+<div id="bulk-bar">
+  <span class="bulk-count"><span id="bulk-count-num">0</span> selected</span>
+  <div style="display:flex;gap:.5rem">
+    <button class="btn-bulk-edit" onclick="openBulkEditModal()">✏️ Edit Species</button>
+    <button class="btn-bulk-edit" style="background:#4a2a2a;color:#e07070" onclick="bulkDelete()">🗑️ Delete</button>
+    <button class="btn-bulk-cancel" onclick="clearSelection()">Cancel</button>
+  </div>
+</div>
+
 <!-- Edit modal -->
 <div id="edit-modal-bg" onclick="closeEditModal(event)">
   <div id="edit-modal">
-    <h6>Edit Species</h6>
+    <h6 id="edit-modal-title">Edit Species</h6>
     <input id="edit-common" placeholder="Common name (e.g. Carolina Wren)" autocomplete="off">
     <input id="edit-scientific" placeholder="Scientific name (optional)" autocomplete="off">
     <div style="display:flex;gap:.5rem;justify-content:flex-end">
@@ -261,7 +282,7 @@ function renderTable(rows) {
     const dur = d.visit_duration ? `${Math.round(d.visit_duration)}s` : '—';
     const spDisplay = d.common_name || d.species || '<span class="text-muted">Unknown</span>';
     const actions = `<button class="btn-act" title="Edit species" onclick="openEditModal(${d.id},'${(d.common_name||'').replace(/'/g,"&#39;")}','${(d.species||'').replace(/'/g,"&#39;")}')" >✏️</button><button class="btn-act" title="Delete" onclick="deleteDetection(${d.id},this)">🗑️</button>`;
-    return `<tr id="det-row-${d.id}"><td>${thumb}</td><td class="small">${ts}</td><td><span class="badge badge-species">${spDisplay}</span></td><td>${confStr}</td><td class="small">${d.spike_score?d.spike_score.toFixed(2):'—'}</td><td class="small">${dur}</td><td>${video}</td><td style="white-space:nowrap">${actions}</td></tr>`;
+    return `<tr id="det-row-${d.id}"><td><input type="checkbox" class="det-check row-check" data-id="${d.id}" onchange="updateBulkBar()"></td><td>${thumb}</td><td class="small">${ts}</td><td><span class="badge badge-species">${spDisplay}</span></td><td>${confStr}</td><td class="small">${d.spike_score?d.spike_score.toFixed(2):'—'}</td><td class="small">${dur}</td><td>${video}</td><td style="white-space:nowrap">${actions}</td></tr>`;
   }).join('');
 }
 
@@ -406,41 +427,132 @@ async function deleteDetection(id, btn) {
 }
 
 let _editId = null;
+let _bulkMode = false;
+
 function openEditModal(id, commonName, scientific) {
   _editId = id;
+  _bulkMode = false;
+  document.getElementById('edit-modal-title').textContent = 'Edit Species';
   document.getElementById('edit-common').value = commonName;
   document.getElementById('edit-scientific').value = scientific;
   document.getElementById('edit-modal-bg').classList.add('open');
   document.getElementById('edit-common').focus();
 }
+
+function openBulkEditModal() {
+  _editId = null;
+  _bulkMode = true;
+  const count = getSelectedIds().length;
+  document.getElementById('edit-modal-title').textContent = `Edit ${count} Detection${count !== 1 ? 's' : ''}`;
+  document.getElementById('edit-common').value = '';
+  document.getElementById('edit-scientific').value = '';
+  document.getElementById('edit-modal-bg').classList.add('open');
+  document.getElementById('edit-common').focus();
+}
+
 function closeEditModal(e) {
   if (!e || e.target === document.getElementById('edit-modal-bg')) {
     document.getElementById('edit-modal-bg').classList.remove('open');
     _editId = null;
+    _bulkMode = false;
   }
 }
+
 async function saveEdit() {
   const common_name = document.getElementById('edit-common').value.trim();
   const species = document.getElementById('edit-scientific').value.trim() || null;
-  if (!common_name || _editId === null) return;
-  const r = await fetch(`/api/detection/${_editId}`, {
-    method: 'PATCH',
+  if (!common_name) return;
+
+  if (_bulkMode) {
+    // Bulk update
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    const r = await fetch('/api/detections/bulk', {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ids, common_name, species}),
+    });
+    if (r.ok) {
+      closeEditModal();
+      // Update local cache + DOM
+      for (const id of ids) {
+        const idx = allRecent.findIndex(d => d.id === id);
+        if (idx >= 0) { allRecent[idx].common_name = common_name; if (species) allRecent[idx].species = species; }
+        const row = document.getElementById(`det-row-${id}`);
+        if (row) { const badge = row.querySelector('.badge-species'); if (badge) badge.textContent = common_name; }
+      }
+      clearSelection();
+      load();
+    } else {
+      alert('Bulk update failed');
+    }
+  } else {
+    // Single update
+    if (_editId === null) return;
+    const r = await fetch(`/api/detection/${_editId}`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({common_name, species}),
+    });
+    if (r.ok) {
+      closeEditModal();
+      const idx = allRecent.findIndex(d => d.id === _editId);
+      if (idx >= 0) { allRecent[idx].common_name = common_name; if (species) allRecent[idx].species = species; }
+      const row = document.getElementById(`det-row-${_editId}`);
+      if (row) { const badge = row.querySelector('.badge-species'); if (badge) badge.textContent = common_name; }
+      load();
+    } else {
+      alert('Save failed');
+    }
+  }
+}
+
+// ── Multi-select helpers ─────────────────────────────────────────────────────
+function getSelectedIds() {
+  return [...document.querySelectorAll('.row-check:checked')].map(cb => parseInt(cb.dataset.id));
+}
+
+function updateBulkBar() {
+  const count = getSelectedIds().length;
+  document.getElementById('bulk-count-num').textContent = count;
+  document.getElementById('bulk-bar').classList.toggle('open', count > 0);
+  // Sync "select all" checkbox
+  const all = document.querySelectorAll('.row-check');
+  const checked = document.querySelectorAll('.row-check:checked');
+  document.getElementById('select-all').checked = all.length > 0 && all.length === checked.length;
+  document.getElementById('select-all').indeterminate = checked.length > 0 && checked.length < all.length;
+}
+
+function toggleSelectAll(el) {
+  document.querySelectorAll('.row-check').forEach(cb => cb.checked = el.checked);
+  updateBulkBar();
+}
+
+function clearSelection() {
+  document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
+  document.getElementById('select-all').checked = false;
+  document.getElementById('select-all').indeterminate = false;
+  document.getElementById('bulk-bar').classList.remove('open');
+}
+
+async function bulkDelete() {
+  const ids = getSelectedIds();
+  if (!ids.length) return;
+  if (!confirm(`Delete ${ids.length} detection${ids.length !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+  const r = await fetch('/api/detections/bulk', {
+    method: 'DELETE',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({common_name, species}),
+    body: JSON.stringify({ids}),
   });
   if (r.ok) {
-    closeEditModal();
-    // Update in allRecent cache and re-render
-    const idx = allRecent.findIndex(d => d.id === _editId);
-    if (idx >= 0) { allRecent[idx].common_name = common_name; if (species) allRecent[idx].species = species; }
-    const row = document.getElementById(`det-row-${_editId}`);
-    if (row) {
-      const badge = row.querySelector('.badge-species');
-      if (badge) badge.textContent = common_name;
+    for (const id of ids) {
+      document.getElementById(`det-row-${id}`)?.remove();
     }
-    load(); // refresh species chart / counts
+    allRecent = allRecent.filter(d => !ids.includes(d.id));
+    clearSelection();
+    load();
   } else {
-    alert('Save failed');
+    alert('Bulk delete failed');
   }
 }
 document.addEventListener('keydown', e => {

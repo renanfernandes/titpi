@@ -238,10 +238,16 @@ def record_video(path, label, ts, baseline_median=0.0):
 
 
 def identify_best(photo_path, extra_photos, label):
-    """Run GPT vision on all photos, return best_species dict."""
+    """Run identification on photos, return best_species dict.
+    
+    Tries each photo with local classifier first. If a confident local
+    match is found, returns immediately. Only falls back to GPT on the
+    single best-quality photo if local fails on all of them.
+    """
     all_photos = [photo_path] + extra_photos
     best_species, best_photo, best_score = None, photo_path, -1
 
+    # Pass 1: try local classifier on each photo (fast, no network)
     for p in all_photos:
         try:
             from PIL import Image as _Image
@@ -255,6 +261,9 @@ def identify_best(photo_path, extra_photos, label):
             best_species = result
             best_photo = p
             log.info(f"Best photo: {os.path.basename(p)} (conf={best_score:.0%})")
+            # If local classifier is confident, stop early
+            if result.get("source") == "local" and best_score >= 0.3:
+                break
 
     # Clean up extras we didn't pick
     for p in extra_photos:

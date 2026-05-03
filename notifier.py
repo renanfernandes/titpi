@@ -33,9 +33,12 @@ def send_detection_email(label, confidence, image_path=None, video_path=None, sp
             subject = f"TitPi Alert: {species['common_name']} ({label.upper()}) detected!"
     body = f"Detected as: {label}\nConfidence: {confidence:.2f}\n"
     if species:
-        body += f"\nGPT says: {species['common_name']} ({species['name']})\n"
+        source = species.get('source', 'unknown')
+        source_label = 'Local model' if source == 'local' else 'GPT' if source == 'gpt' else source
+        body += f"\n{source_label} says: {species['common_name']} ({species['name']})\n"
         body += f"Category: {species.get('category', label)}\n"
         body += f"ID confidence: {species['score']:.0%}\n"
+        body += f"Source: {source_label}\n"
     if image_path:
         body += f"Snapshot: {image_path}\n"
     if video_path:

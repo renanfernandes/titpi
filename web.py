@@ -150,6 +150,39 @@ def api_update_detection(detection_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/detections/bulk", methods=["PATCH"])
+def api_bulk_update():
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ids", [])
+    common_name = data.get("common_name", "").strip()
+    species = data.get("species", "").strip() or None
+    if not common_name or not ids:
+        abort(400)
+    if re.search(r'[<>"\']', common_name + (species or "")):
+        abort(400)
+    # Validate ids are all integers
+    if not all(isinstance(i, int) for i in ids) or len(ids) > 500:
+        abort(400)
+    for det_id in ids:
+        database.update_detection_species(det_id, common_name, species)
+    return jsonify({"ok": True, "updated": len(ids)})
+
+
+@app.route("/api/detections/bulk", methods=["DELETE"])
+def api_bulk_delete():
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ids", [])
+    if not ids:
+        abort(400)
+    if not all(isinstance(i, int) for i in ids) or len(ids) > 500:
+        abort(400)
+    deleted = 0
+    for det_id in ids:
+        if database.delete_detection(det_id):
+            deleted += 1
+    return jsonify({"ok": True, "deleted": deleted})
+
+
 @app.route("/photo/<filename>")
 def serve_photo(filename):
     # Prevent path traversal
