@@ -216,7 +216,15 @@ async function load() {
   charts.species = new Chart(document.getElementById('chartSpecies'), {
     type: 'doughnut',
     data: { labels: species.map(s=>s.name), datasets:[{ data: species.map(s=>s.count), backgroundColor: COLORS }] },
-    options: { plugins:{ legend:{ labels:{ color:'#ccc', font:{size:11} } } } }
+    options: {
+      onClick(e, els) {
+        if (!els.length) return;
+        const idx = els[0].index;
+        const name = species[idx].name;
+        filterBySpecies(name);
+      },
+      plugins:{ legend:{ labels:{ color:'#ccc', font:{size:11}, cursor:'pointer' } }, tooltip:{callbacks:{title:l=>`${l[0].label} — click to filter`}} }
+    }
   });
 
   const hours = Array.from({length:24},(_,i)=>i);
@@ -297,6 +305,15 @@ async function filterByHour(hour) {
   const label = `${String(hour).padStart(2,'0')}:00`;
   document.getElementById('det-title').textContent = `Detections — ${label}`;
   document.getElementById('filter-label').textContent = `Hour: ${label}`;
+  document.getElementById('filter-badge').style.display = '';
+  renderTable(rows);
+  document.getElementById('det-tbody').closest('.card').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function filterBySpecies(name) {
+  const rows = await fetch(`/api/by_species/${encodeURIComponent(name)}`).then(r=>r.json());
+  document.getElementById('det-title').textContent = `Detections — ${name}`;
+  document.getElementById('filter-label').textContent = `Species: ${name}`;
   document.getElementById('filter-badge').style.display = '';
   renderTable(rows);
   document.getElementById('det-tbody').closest('.card').scrollIntoView({behavior:'smooth',block:'start'});

@@ -148,6 +148,25 @@ def get_by_date(date_str):
     return [dict(r) for r in rows]
 
 
+def get_by_species(common_name, days=30):
+    """Return recent detections for a specific species."""
+    with _connect() as conn:
+        if common_name == "Unknown":
+            rows = conn.execute("""
+                SELECT * FROM detections
+                WHERE (common_name IS NULL OR common_name = 'Unknown')
+                  AND timestamp >= datetime('now', ?)
+                ORDER BY timestamp DESC
+            """, (f"-{days} days",)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT * FROM detections
+                WHERE common_name = ? AND timestamp >= datetime('now', ?)
+                ORDER BY timestamp DESC
+            """, (common_name, f"-{days} days")).fetchall()
+    return [dict(r) for r in rows]
+
+
 def set_bird_of_day(date_str, species, common_name, photo_path, visit_count):
     """Upsert the bird of the day record for a given date."""
     with _connect() as conn:

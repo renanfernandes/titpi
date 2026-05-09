@@ -1,0 +1,23 @@
+{
+    "_comment": "Maps model output names to canonical names. Keys are common_name from classifier, values are [canonical_common_name, canonical_scientific_name].",
+    "Bewick's Wren": ["Carolina Wren", "Thryothorus ludovicianus"],
+    "Wren": ["Carolina Wren", "Thryothorus ludovicianus"],
+    "House Wren": ["Carolina Wren", "Thryothorus ludovicianus"],
+    "Sennett's Titmouse": ["Tufted Titmouse", "Baeolophus bicolor"],
+    "Common Cardinal": ["Northern Cardinal", "Cardinalis cardinalis"],
+    "Anec coll-verd": ["Mallard", "Anas platyrhynchos"],
+    "Mountain Bluebird": ["Eastern Bluebird", "Sialia sialis"],
+    "Bluebird": ["Eastern Bluebird", "Sialia sialis"],
+    "Nuthatch": ["White-breasted Nuthatch", "Sitta carolinensis"],
+    "Goldfinch": ["American Goldfinch", "Spinus tristis"],
+    "Sparrow": ["House Sparrow", "Passer domesticus"],
+    "Catbird": ["Gray Catbird", "Dumetella carolinensis"],
+    "Blackbird": ["Red-Winged Blackbird", "Agelaius phoeniceus"],
+    "Continental Robin": ["American Robin", "Turdus migratorius"],
+    "Common Greenfinch": ["European Greenfinch", "Chloris chloris"],
+    "Chaffinch": ["House Finch", "Haemorhous mexicanus"],
+    "Starling": ["European Starling", "Sturnus vulgaris"],
+    "Gaulin": ["Green Heron", "Butorides virescens"],
+    "Bird": ["Unknown", "Unknown"],
+    "Unknown Bird": ["Unknown", "Unknown"]
+}

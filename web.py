@@ -118,6 +118,13 @@ def api_species():
     return jsonify(database.get_species_counts(30))
 
 
+@app.route("/api/by_species/<species_name>")
+def api_by_species(species_name):
+    if re.search(r'[<>"\']', species_name):
+        abort(400)
+    return jsonify(database.get_by_species(species_name))
+
+
 @app.route("/api/hourly")
 def api_hourly():
     return jsonify(database.get_hourly_counts(30))

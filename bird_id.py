@@ -31,6 +31,24 @@ IDENTIFY_ALL = _gh_config.get("identify_all", True)
 LOCAL_ENABLED = _local_config.get("enabled", True)
 LOCAL_MIN_CONFIDENCE = _local_config.get("min_confidence", 0.3)
 
+# Species aliases — normalizes model output to canonical names
+_ALIASES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "species_aliases.json")
+_species_aliases = {}
+if _local_config.get("normalize_species", True) and os.path.isfile(_ALIASES_PATH):
+    with open(_ALIASES_PATH) as _af:
+        _species_aliases = {k: v for k, v in json.load(_af).items() if not k.startswith("_")}
+
+
+def _apply_alias(result):
+    """Normalize common_name using the species alias table."""
+    if not result or not _species_aliases:
+        return result
+    alias = _species_aliases.get(result.get("common_name"))
+    if alias:
+        result["common_name"] = alias[0]
+        result["name"] = alias[1]
+    return result
+
 # Lazy import — only loaded if local classifier is used
 _bird_classify = None
 
@@ -87,7 +105,7 @@ def _try_local(image_path):
     runner_up = predictions[1].get("common_name", predictions[1]["name"]) if len(predictions) > 1 else ""
     print(f"[BIRD_ID] [Local] {result['common_name']} ({best['name']}) conf={best['score']:.0%}"
           f"{f' (runner-up: {runner_up})' if runner_up else ''}")
-    return result
+    return _apply_alias(result)
 
 
 def identify_image(image_path, detected_label="bird", _retry=0):
@@ -191,7 +209,7 @@ def identify_image(image_path, detected_label="bird", _retry=0):
         print(f"[BIRD_ID] [GPT] {result['common_name']} ({result['name']}) "
               f"conf={result['score']:.0%} — {notes}")
 
-        return result
+        return _apply_alias(result)
 
     except (json.JSONDecodeError, KeyError, IndexError) as e:
         print(f"[BIRD_ID] Failed to parse response: {e}")
