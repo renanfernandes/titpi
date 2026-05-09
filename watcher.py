@@ -105,10 +105,10 @@ log.info(f"Model: {os.path.basename(MODEL_PATH)}")
 log.info(f"Targets: {', '.join(TARGET_LABELS)} | Threshold: {CONFIDENCE}")
 log.info(f"Save: {SAVE_DIR} | Log: {LOG_PATH}")
 
-# If capture_metadata() hangs (camera crash), exit so run.sh can restart us
+# If capture_metadata() hangs (camera crash), exit so systemd can restart us
 def _timeout_exit(signum, frame):
     log.error("Camera hung (no response for 15s), exiting for restart...")
-    sys.exit(1)
+    os._exit(1)  # Force exit, bypass finally (picam2.stop() would also hang)
 
 signal.signal(signal.SIGALRM, _timeout_exit)
 
@@ -309,7 +309,7 @@ try:
             last_output_change = time.time()
         elif time.time() - last_output_change > FROZEN_TIMEOUT:
             log.error(f"AI pipeline frozen for {FROZEN_TIMEOUT}s, exiting for restart...")
-            sys.exit(1)
+            os._exit(1)
 
         top_label, top_score = get_top_score(out)
 
