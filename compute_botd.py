@@ -13,6 +13,7 @@ Usage:
 
 import sys
 import os
+import shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import database
@@ -73,6 +74,20 @@ def compute(date_str=None):
         photo_path=photo_path,
         visit_count=visit_count,
     )
+
+    # Copy best photo to bird_of_the_day directory
+    if photo_path:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        botd_dir = os.path.join(base_dir, "detections", "bird_of_the_day")
+        os.makedirs(botd_dir, exist_ok=True)
+        ext = os.path.splitext(photo_path)[1] or ".jpg"
+        dest = os.path.join(botd_dir, f"{date_str}{ext}")
+        src = photo_path if os.path.isabs(photo_path) else os.path.join(base_dir, photo_path)
+        if os.path.isfile(src):
+            shutil.copy2(src, dest)
+            print(f"Copied BOTD photo → {dest}")
+        else:
+            print(f"Warning: BOTD photo not found at {src}")
 
     tag = " ⭐ FIRST SIGHTING EVER!" if first_time else ""
     print(f"Bird of the Day for {date_str}: {winner} ({visit_count} visit(s)){tag} — {os.path.basename(photo_path or '')}")
