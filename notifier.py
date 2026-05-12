@@ -17,6 +17,11 @@ SMTP_PORT = int(_config.get("smtp_port", 587))
 EMAIL_FROM = _config.get("from", "")
 EMAIL_PASSWORD = _config.get("password", "")
 EMAIL_TO = _config.get("to", "")
+ATTACH_VIDEO = _config.get("attach_video", True)
+
+_web_cfg = json.load(open(CONFIG_PATH)).get("database", {})
+WEB_HOST = _web_cfg.get("web_host", "10.0.1.60")
+WEB_PORT = _web_cfg.get("web_port", 8080)
 
 
 def send_detection_email(label, confidence, image_path=None, video_path=None, species=None):
@@ -56,15 +61,19 @@ def send_detection_email(label, confidence, image_path=None, video_path=None, sp
             msg.attach(img)
 
     if video_path and os.path.exists(video_path):
-        with open(video_path, "rb") as f:
-            video = MIMEBase("video", "mp4")
-            video.set_payload(f.read())
-            email_encoders.encode_base64(video)
-            video.add_header(
-                "Content-Disposition",
-                f"attachment; filename={os.path.basename(video_path)}"
-            )
-            msg.attach(video)
+        if ATTACH_VIDEO:
+            with open(video_path, "rb") as f:
+                video = MIMEBase("video", "mp4")
+                video.set_payload(f.read())
+                email_encoders.encode_base64(video)
+                video.add_header(
+                    "Content-Disposition",
+                    f"attachment; filename={os.path.basename(video_path)}"
+                )
+                msg.attach(video)
+        else:
+            link = f"http://{WEB_HOST}:{WEB_PORT}/video/{os.path.basename(video_path)}"
+            msg.attach(MIMEText(f"\nVideo: {link}\n", "plain"))
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:

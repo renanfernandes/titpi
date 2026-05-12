@@ -17,7 +17,8 @@
         "smtp_port": 587,
         "from": "",
         "password": "",
-        "to": ""
+        "to": "",
+        "attach_video": false
     },
     "local_classifier": {
         "enabled": true,
