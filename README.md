@@ -15,13 +15,14 @@ An edge-AI bird surveillance system built on **Raspberry Pi Zero 2W** and the **
 - **Bird of the Day** — daily ranking that prioritizes first-ever sightings, with photos saved to `detections/bird_of_the_day/`
 - **Email alerts** — per-detection notifications with photo attachment; video attached or linked (configurable)
 - **Auto-recovery** — systemd services with crash restart + frozen-pipeline detection (`os._exit` on camera hang)
+- **Dual camera support** — works with IMX500 (AI Camera, on-chip detection) or Camera Module 3 (motion detection mode)
 
 ## Hardware
 
 | Component | Model |
 |-----------|-------|
-| Board | Raspberry Pi Zero 2W |
-| Camera | Sony IMX500 (AI Camera) |
+| Board | Raspberry Pi Zero 2W (or Pi 3/4) |
+| Camera | Sony IMX500 (AI Camera) **or** Raspberry Pi Camera Module 3 |
 | OS | Raspberry Pi OS Bookworm 64-bit |
 
 ## Architecture
@@ -55,20 +56,22 @@ database.py           SQLite schema and queries
 web.py                Flask dashboard backend
 compute_botd.py       Bird of the Day selection + photo copy (daily)
 notifier.py           Email notifications (configurable video attach/link)
-backfill.py           Re-identify past detections in batch
-preview.py            Live MJPEG preview stream for setup
-run.sh                Auto-restart wrapper
 config.json           Runtime configuration (not tracked)
 config_example.json   Configuration template
 species_aliases.json  Maps variant species names to canonical names
+tools/
+  preview.py          Live MJPEG preview stream for setup
+  backfill.py         Re-identify past detections in batch
+  reidentify.py       Re-run identification on unknown detections
 templates/
   dashboard.html      Single-page dashboard (Bootstrap + Chart.js)
 detections/
   bird_of_the_day/    Daily best photo archive (YYYY-MM-DD.jpg)
-titpi.service         Systemd unit — watcher
-titpi-web.service     Systemd unit — web dashboard
-titpi-botd.service    Systemd unit — bird of the day (one-shot)
-titpi-botd.timer      Systemd timer — triggers botd at 19:00
+services/
+  titpi.service       Systemd unit — watcher
+  titpi-web.service   Systemd unit — web dashboard
+  titpi-botd.service  Systemd unit — bird of the day (one-shot)
+  titpi-botd.timer    Systemd timer — triggers botd at 19:00
 ```
 
 ## Installation
@@ -92,7 +95,7 @@ cp config_example.json config.json
 ### 3. Set up systemd services
 
 ```bash
-sudo cp titpi.service titpi-web.service titpi-botd.service titpi-botd.timer /etc/systemd/system/
+sudo cp services/titpi.service services/titpi-web.service services/titpi-botd.service services/titpi-botd.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now titpi.service titpi-web.service titpi-botd.timer
 ```
@@ -105,8 +108,10 @@ Copy `config_example.json` to `config.json` and fill in your values:
 
 | Section | Key | Description |
 |---------|-----|-------------|
+| `camera` | `mode` | `"imx500"` (AI Camera) or `"motion"` (Camera Module 3) |
 | `camera` | `confidence_threshold` | Minimum IMX500 detection score (default: 0.25) |
 | `camera` | `spike_threshold` | Margin above baseline to trigger (default: 0.20) |
+| `camera` | `baseline_frames` | Frames used to calibrate the idle baseline (default: 60) |
 | `camera` | `confirmation_frames` | Consecutive spike frames required (default: 2) |
 | `camera` | `cooldown` | Seconds between detections (default: 10) |
 | `camera` | `target_labels` | COCO classes to detect (default: bird, person, dog) |
@@ -134,15 +139,27 @@ ssh titpi@titpi.local "sudo systemctl restart titpi.service"
 ### Live camera preview (for aiming/setup)
 
 ```bash
-ssh titpi@titpi.local "python3 /home/titpi/titpi/preview.py"
-# Open http://<pi-ip>:8080 in browser
+ssh titpi@titpi.local "python3 /home/titpi/titpi/tools/preview.py"
+# Open http://<pi-ip>:8081 in browser
 ```
 
 ### Backfill missing identifications
 
 ```bash
-ssh titpi@titpi.local "python3 /home/titpi/titpi/backfill.py"
+ssh titpi@titpi.local "python3 /home/titpi/titpi/tools/backfill.py"
 ```
+
+## Local Classifier — AIY Birds V1
+
+The local species classifier uses Google's **AIY Birds V1** MobileNet model, originally from the [AIY Vision Kit](https://aiyprojects.withgoogle.com/) project.
+
+- **Model:** `aiy_birds_v1.tflite` — MobileNet V1, 224×224 input, uint8, 964 species
+- **Labels:** `aiy_birds_labelmap.csv` — species scientific names
+- **Common names:** `bird_common_names.json` — maps scientific → common names
+
+These files are placed in the project root on the Pi (`/home/titpi/titpi/`) and are excluded from git (`.tflite` in `.gitignore`).
+
+**Credit:** Model by Google, from the [AIY Vision Kit](https://aiyprojects.withgoogle.com/) / [TF Model Garden](https://github.com/google/aiy-maker-kit).
 
 ## License
 

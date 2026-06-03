@@ -38,20 +38,20 @@ def api_stats():
 
     # Fallback: live count if botd not yet computed today
     if not botd:
-        botd_counts = {}
+        counts = {}
         for r in today_rows:
             name = r.get("common_name") or r.get("species") or "Unknown"
             if name.lower() not in ("unknown", "none"):
-                botd_counts[name] = botd_counts.get(name, 0) + 1
-        if botd_counts:
-            winner = max(botd_counts, key=botd_counts.get)
-            # Best photo for live fallback
-            candidates = [r for r in today_rows if (r.get("common_name") or r.get("species")) == winner and r.get("photo_path")]
-            candidates.sort(key=lambda r: r.get("gpt_confidence") or 0, reverse=True)
+                counts[name] = counts.get(name, 0) + 1
+        if counts:
+            import compute_botd as _botd
+            weighted = _botd.score_species(counts, today_rows)
+            winner = max(weighted, key=weighted.get)
+            best = _botd.best_photo(today_rows, winner)
             botd = {
                 "common_name": winner,
-                "photo_path": candidates[0]["photo_path"] if candidates else None,
-                "visit_count": botd_counts[winner],
+                "photo_path": best["photo_path"] if best else None,
+                "visit_count": counts[winner],
             }
 
     botd_photo = None
@@ -115,7 +115,13 @@ def api_recent():
 
 @app.route("/api/species")
 def api_species():
-    return jsonify(database.get_species_counts(30))
+    try:
+        days = int(request.args.get("days", 30))
+    except ValueError:
+        abort(400)
+    if days < 0:
+        abort(400)
+    return jsonify(database.get_species_counts(days or None))
 
 
 @app.route("/api/by_species/<species_name>")
@@ -127,12 +133,24 @@ def api_by_species(species_name):
 
 @app.route("/api/hourly")
 def api_hourly():
-    return jsonify(database.get_hourly_counts(30))
+    try:
+        days = int(request.args.get("days", 30))
+    except ValueError:
+        abort(400)
+    if days < 0:
+        abort(400)
+    return jsonify(database.get_hourly_counts(days or None))
 
 
 @app.route("/api/daily")
 def api_daily():
-    return jsonify(database.get_daily_counts(30))
+    try:
+        days = int(request.args.get("days", 30))
+    except ValueError:
+        abort(400)
+    if days < 0:
+        abort(400)
+    return jsonify(database.get_daily_counts(days or None))
 
 
 @app.route("/api/detection/<int:detection_id>", methods=["DELETE"])
@@ -188,6 +206,19 @@ def api_bulk_delete():
         if database.delete_detection(det_id):
             deleted += 1
     return jsonify({"ok": True, "deleted": deleted})
+
+
+@app.route("/api/detection/<int:detection_id>/star", methods=["POST"])
+def api_toggle_star(detection_id):
+    starred = database.toggle_star(detection_id)
+    if starred is None:
+        abort(404)
+    return jsonify({"ok": True, "starred": starred})
+
+
+@app.route("/api/starred")
+def api_starred():
+    return jsonify(database.get_starred())
 
 
 @app.route("/photo/<filename>")

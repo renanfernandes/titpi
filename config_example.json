@@ -1,5 +1,6 @@
 {
     "camera": {
+        "mode": "imx500",
         "model_path": "/usr/share/imx500-models/imx500_network_efficientdet_lite0_pp.rpk",
         "confidence_threshold": 0.55,
         "confirmation_frames": 3,
@@ -10,7 +11,11 @@
         "photo_interval": 3,
         "cooldown": 15,
         "save_directory": "/home/titpi/titpi/detections",
-        "target_labels": ["bird", "person", "dog"]
+        "target_labels": ["bird", "person", "dog"],
+        "spike_threshold": 0.20,
+        "baseline_frames": 60,
+        "motion_threshold": 5.0,
+        "motion_min_area": 0.01
     },
     "email": {
         "smtp_host": "smtp.gmail.com",

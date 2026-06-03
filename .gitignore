@@ -1,4 +1,6 @@
 config.json
+config_lcd.json
+notifier_lcd.py
 detections/
 __pycache__/
 *.pyc

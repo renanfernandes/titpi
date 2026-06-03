@@ -10,22 +10,33 @@ Usage:
 """
 
 import io
+import os
 import sys
+import json
 import time
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import numpy as np
 from picamera2 import Picamera2
-from picamera2.devices import IMX500
 from PIL import Image, ImageDraw, ImageFont
 
 # --- CONFIG ---
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+sys.path.insert(0, _ROOT)
+CONFIG_PATH = os.path.join(_ROOT, "config.json")
+with open(CONFIG_PATH) as _f:
+    _cfg = json.load(_f)["camera"]
+
+CAMERA_MODE = _cfg.get("mode", "imx500")
 STREAM_PORT = 8081
 STREAM_SIZE = (640, 480)
-SHOW_DETECTIONS = "--detections" in sys.argv
-MODEL_PATH = "/usr/share/imx500-models/imx500_network_efficientdet_lite0_pp.rpk"
-CONFIDENCE_THRESHOLD = 0.40  # lower than watcher to see marginal detections
+SHOW_DETECTIONS = "--detections" in sys.argv and CAMERA_MODE == "imx500"
+MODEL_PATH = _cfg.get("model_path", "/usr/share/imx500-models/imx500_network_efficientdet_lite0_pp.rpk")
+CONFIDENCE_THRESHOLD = 0.40
+
+if CAMERA_MODE == "imx500":
+    from picamera2.devices import IMX500
 
 COCO_LABELS = {
     0: "person", 1: "person", 2: "bicycle", 3: "car", 4: "motorcycle", 5: "airplane",
@@ -104,15 +115,15 @@ def draw_detections(image, np_outputs):
     return image
 
 
-def capture_loop(picam2, imx500):
+def capture_loop(picam2, imx500=None):
     """Continuously capture frames and store the latest JPEG."""
     global latest_frame
     while True:
         array = picam2.capture_array()
-        metadata = picam2.capture_metadata()
         image = Image.fromarray(array).convert("RGB")
 
-        if SHOW_DETECTIONS:
+        if SHOW_DETECTIONS and imx500 is not None:
+            metadata = picam2.capture_metadata()
             np_outputs = imx500.get_outputs(metadata, add_batch=True)
             image = draw_detections(image, np_outputs)
 
@@ -164,12 +175,21 @@ img{{max-width:100%;border:2px solid #333;border-radius:8px}}</style></head>
 
 
 def main():
-    print("Initializing IMX500 AI Sensor...")
-    imx500 = IMX500(MODEL_PATH)
-    picam2 = Picamera2(imx500.camera_num)
+    imx500 = None
+    if CAMERA_MODE == "imx500":
+        print("Initializing IMX500 AI Sensor...")
+        imx500 = IMX500(MODEL_PATH)
+        picam2 = Picamera2(imx500.camera_num)
+    else:
+        print("Initializing Camera Module 3...")
+        picam2 = Picamera2()
+
     config = picam2.create_preview_configuration(main={"size": STREAM_SIZE})
     picam2.configure(config)
     picam2.start()
+    if CAMERA_MODE == "motion":
+        from libcamera import controls
+        picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
     time.sleep(2)
 
     # Start capture thread
@@ -180,9 +200,12 @@ def main():
     while latest_frame is None:
         time.sleep(0.1)
 
+    import socket
+    ip = socket.gethostbyname(socket.gethostname())
+    mode_str = 'AI detections ON' if SHOW_DETECTIONS else f'plain video ({CAMERA_MODE})'
     print(f"\n--- TitPi Camera Preview ---")
-    print(f"  Stream: http://10.0.1.60:{STREAM_PORT}")
-    print(f"  Mode:   {'AI detections ON' if SHOW_DETECTIONS else 'plain video'}")
+    print(f"  Stream: http://{ip}:{STREAM_PORT}")
+    print(f"  Mode:   {mode_str}")
     print(f"  Press Ctrl+C to stop.\n")
 
     server = HTTPServer(("0.0.0.0", STREAM_PORT), MJPEGHandler)

@@ -59,11 +59,78 @@
   #bulk-bar .btn-bulk-edit:hover { background:#3a5a4a; }
   #bulk-bar .btn-bulk-cancel { background:#2a2d3a; color:#aaa; }
   #bulk-bar .btn-bulk-cancel:hover { background:#3a3d4a; }
+  /* Date picker button */
+  #cal-btn { display:flex; align-items:center; gap:.5rem; background:#1a1d27; border:1px solid #2a2d3a; border-radius:8px; padding:.3rem .75rem; color:#e0e0e0; font-size:.85rem; cursor:pointer; transition:border-color .15s; white-space:nowrap; }
+  #cal-btn:hover { border-color:#7ec8e3; }
+  #cal-btn.active { border-color:#7ec8e3; color:#7ec8e3; }
+  .nav-date-btn { background:none; border:none; color:#7ec8e3; cursor:pointer; padding:0 3px; font-size:1rem; opacity:.6; transition:opacity .15s; }
+  .nav-date-btn:hover { opacity:1; }
+  #active-date-badge { display:none; background:#2a4a3a; color:#7ec8aa; border-radius:6px; font-size:.78rem; padding:2px 10px; align-items:center; gap:.4rem; }
+  #active-date-badge.visible { display:inline-flex; }
+  #active-date-badge button { background:none; border:none; color:#7ec8aa; cursor:pointer; padding:0; font-size:.9rem; line-height:1; }
+  /* Custom calendar popup */
+  #cal-popup { display:none; position:fixed; z-index:9990; background:#1a1d27; border:1px solid #2a2d3a; border-radius:12px; padding:1rem; box-shadow:0 8px 40px rgba(0,0,0,.75); width:280px; user-select:none; }
+  #cal-popup.open { display:block; }
+  .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem; }
+  .cal-header span { font-weight:600; font-size:.95rem; color:#e0e0e0; }
+  .cal-nav { background:none; border:none; color:#e07070; font-size:1.3rem; cursor:pointer; padding:0 6px; border-radius:4px; line-height:1; transition:background .1s; }
+  .cal-nav:hover { background:#2a1a1a; }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+  .cal-dow { text-align:center; font-size:.7rem; color:#555; padding:2px 0 6px; }
+  .cal-day { display:flex; flex-direction:column; align-items:center; padding:3px 0; cursor:pointer; position:relative; }
+  .cal-day:hover:not(.cal-empty):not(.cal-future) .cal-num { background:#2a2d3a; }
+  .cal-num { font-size:.88rem; color:#e0e0e0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; }
+  .cal-day.cal-today .cal-num { background:#e07070; color:#fff; font-weight:700; }
+  .cal-day.cal-selected .cal-num { background:#7ec8e3; color:#0f1117; font-weight:700; }
+  .cal-day.cal-today.cal-selected .cal-num { background:#7ec8e3; }
+  .cal-dot { width:4px; height:4px; border-radius:50%; background:#e07070; margin-top:2px; visibility:hidden; }
+  .cal-day.cal-has-visits .cal-dot { visibility:visible; }
+  .cal-day.cal-today .cal-dot { background:rgba(255,255,255,.6); }
+  .cal-day.cal-selected .cal-dot { background:#0a6a8a; }
+  .cal-day.cal-today.cal-selected .cal-dot { background:#0a5a7a; }
+  .cal-empty { pointer-events:none; }
+  .cal-day.cal-future .cal-num { color:#3a3d4a; cursor:default; }
+  .cal-day.cal-future { pointer-events:none; }
+  /* Period pills */
+  .period-pills { display:flex; gap:4px; margin-bottom:.5rem; flex-wrap:wrap; }
+  .period-pill { background:#2a2d3a; border:1px solid #3a3d4a; color:#aaa; border-radius:6px; padding:2px 10px; font-size:.75rem; cursor:pointer; transition:background .15s,color .15s; white-space:nowrap; }
+  .period-pill:hover { background:#3a3d4a; color:#e0e0e0; }
+  .period-pill.active { background:#2a4a3a; border-color:#7ec8aa; color:#7ec8aa; }
+  /* Species filter */
+  .species-filter-bar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; background:#13161f; border:1px solid #2a2d3a; border-radius:8px; padding:.4rem .75rem; margin-bottom:.75rem; }
+  .species-filter-bar label { color:#7ec8e3; font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+  #species-text-filter { background:#1a1d27; border:1px solid #3a3d4a; color:#e0e0e0; border-radius:6px; padding:.25rem .6rem; font-size:.82rem; width:150px; }
+  #species-text-filter::placeholder { color:#555; }
+  #species-text-filter:focus { outline:none; border-color:#7ec8e3; }
+  #species-select { background:#1a1d27; border:1px solid #3a3d4a; color:#e0e0e0; border-radius:6px; padding:.25rem .6rem; font-size:.82rem; cursor:pointer; color-scheme:dark; min-width:160px; }
+  #species-select:focus { outline:none; border-color:#7ec8e3; }
+  .btn-export { background:#1a1d27; border:1px solid #3a3d4a; color:#7ec8e3; border-radius:6px; padding:.25rem .75rem; font-size:.78rem; cursor:pointer; transition:background .15s; white-space:nowrap; }
+  .btn-export:hover { background:#2a2d3a; }
+  /* Star button */
+  .btn-star { font-size:1rem; line-height:1; opacity:.45; transition:opacity .15s,transform .1s; }
+  .btn-star:hover { opacity:.85; transform:scale(1.2); }
+  .btn-star.starred { opacity:1; }
+  #starred-filter-btn.active { border-color:#f0c040; color:#f0c040; }
+  /* Load more */
+  #load-more-wrap { text-align:center; padding:.6rem 0 .25rem; border-top:1px solid #2a2d3a; margin-top:.25rem; }
+  #load-more-btn { background:#2a2d3a; border:1px solid #3a3d4a; color:#aaa; border-radius:8px; padding:.3rem 1.2rem; font-size:.82rem; cursor:pointer; transition:background .15s,color .15s; }
+  #load-more-btn:hover { background:#3a3d4a; color:#e0e0e0; }
+  #load-more-count { color:#555; font-size:.75rem; margin-top:.25rem; }
 </style>
 </head>
 <body>
 <nav class="navbar navbar-dark px-3 mb-4">
   <span class="navbar-brand mb-0"><strong>🐦 TitPi</strong> Bird Feeder Dashboard</span>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <button class="nav-date-btn" onclick="stepDate(-1)" title="Previous day">&#8592;</button>
+    <button id="cal-btn" onclick="toggleCalendar(event)" title="Pick a date">📅 <span id="cal-btn-label">Pick a date</span></button>
+    <button class="nav-date-btn" onclick="stepDate(1)" title="Next day">&#8594;</button>
+    <div id="active-date-badge">
+      <span id="active-date-text"></span>
+      <button onclick="clearDateFilter()" title="Clear date filter">&times;</button>
+    </div>
+    <button class="nav-date-btn" onclick="goToday()" style="font-size:.75rem;color:#666;text-decoration:underline">today</button>
+  </div>
   <span class="text-muted small" id="clock"></span>
 </nav>
 <div class="container-fluid px-4">
@@ -71,7 +138,7 @@
   <!-- Stats row -->
   <div class="row g-3 mb-4">
     <div class="col-6 col-md-3"><div class="card p-3">
-      <div class="card-title">Today's Visits</div>
+      <div class="card-title" id="stat-today-label">Today's Visits</div>
       <div class="stat-big" id="stat-today">—</div>
     </div></div>
     <div class="col-6 col-md-3"><div class="card p-3">
@@ -96,17 +163,35 @@
   <!-- Charts row -->
   <div class="row g-3 mb-4">
     <div class="col-md-5"><div class="card p-3">
-      <div class="card-title mb-2">Species Distribution (30d)</div>
-      <canvas id="chartSpecies" height="200"></canvas>
-    </div></div>
+      <div class="card-title mb-1">Species Distribution</div>
+      <div class="period-pills" id="pills-species">
+        <button class="period-pill" onclick="setPeriod('species',7,this)">7d</button>
+        <button class="period-pill" onclick="setPeriod('species',14,this)">14d</button>
+        <button class="period-pill active" onclick="setPeriod('species',30,this)">30d</button>
+        <button class="period-pill" onclick="setPeriod('species',90,this)">90d</button>
+        <button class="period-pill" onclick="setPeriod('species',0,this)">All time</button>
+      </div>
+      <canvas id="chartSpecies" height="200" style="cursor:pointer"></canvas></div></div>
     <div class="col-md-4"><div class="card p-3">
-      <div class="card-title mb-2">Visits by Hour <span class="text-muted" style="font-size:.75rem;text-transform:none">(click to filter)</span></div>
-      <canvas id="chartHour" height="200" style="cursor:pointer"></canvas>
-    </div></div>
+      <div class="card-title mb-1">Visits by Hour <span class="text-muted" style="font-size:.75rem;text-transform:none">(click to filter)</span></div>
+      <div class="period-pills" id="pills-hour">
+        <button class="period-pill" onclick="setPeriod('hour',7,this)">7d</button>
+        <button class="period-pill" onclick="setPeriod('hour',14,this)">14d</button>
+        <button class="period-pill active" onclick="setPeriod('hour',30,this)">30d</button>
+        <button class="period-pill" onclick="setPeriod('hour',90,this)">90d</button>
+        <button class="period-pill" onclick="setPeriod('hour',0,this)">All time</button>
+      </div>
+      <canvas id="chartHour" height="200" style="cursor:pointer"></canvas></div></div>
     <div class="col-md-3"><div class="card p-3">
-      <div class="card-title mb-2">Daily Visits (30d)</div>
-      <canvas id="chartDaily" height="200"></canvas>
-    </div></div>
+      <div class="card-title mb-1">Daily Visits</div>
+      <div class="period-pills" id="pills-daily">
+        <button class="period-pill" onclick="setPeriod('daily',7,this)">7d</button>
+        <button class="period-pill" onclick="setPeriod('daily',14,this)">14d</button>
+        <button class="period-pill active" onclick="setPeriod('daily',30,this)">30d</button>
+        <button class="period-pill" onclick="setPeriod('daily',90,this)">90d</button>
+        <button class="period-pill" onclick="setPeriod('daily',0,this)">All time</button>
+      </div>
+      <canvas id="chartDaily" height="200"></canvas></div></div>
   </div>
 
   <!-- Heatmap -->
@@ -140,11 +225,25 @@
 
   <!-- Recent detections -->
   <div class="card p-3 mb-4">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem" class="flex-wrap gap-2">
       <div class="card-title mb-0" id="det-title">Recent Detections</div>
-      <button id="filter-badge" class="btn btn-sm" style="background:#2a2d3a;color:#7ec8e3;font-size:.75rem" onclick="clearFilter()">
-        <span id="filter-label"></span> &times; clear
-      </button>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <button id="filter-badge" class="btn btn-sm" style="display:none;background:#2a2d3a;color:#7ec8e3;font-size:.75rem" onclick="clearFilter()">
+          <span id="filter-label"></span> &times; clear
+        </button>
+        <button class="btn-export" onclick="exportCSV()" title="Export visible rows as CSV">⬇ Export CSV</button>
+      </div>
+    </div>
+    <!-- Species filter bar -->
+    <div class="species-filter-bar">
+      <label for="species-text-filter">Filter:</label>
+      <input id="species-text-filter" type="text" placeholder="Search species…" oninput="applySpeciesFilter()" autocomplete="off">
+      <label for="species-select">Species:</label>
+      <select id="species-select" onchange="applySpeciesFilter()">
+        <option value="">All species</option>
+      </select>
+      <button id="starred-filter-btn" class="btn-export" onclick="toggleStarredFilter()" title="Show starred only">☆ Starred</button>
+      <button class="btn-export" style="margin-left:auto" onclick="clearSpeciesFilter()">✕ Clear</button>
     </div>
     <div class="table-responsive">
     <table class="table table-sm">
@@ -155,6 +254,10 @@
       </tr></thead>
       <tbody id="det-tbody"></tbody>
     </table>
+    </div>
+    <div id="load-more-wrap" style="display:none">
+      <button id="load-more-btn" onclick="loadMore()">Load more…</button>
+      <div id="load-more-count"></div>
     </div>
   </div>
 
@@ -183,6 +286,16 @@
   </div>
 </div>
 
+<!-- Calendar popup -->
+<div id="cal-popup">
+  <div class="cal-header">
+    <button class="cal-nav" onclick="calNav(-1)">&#8249;</button>
+    <span id="cal-title"></span>
+    <button class="cal-nav" onclick="calNav(1)">&#8250;</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+</div>
+
 <!-- Lightbox -->
 <div id="lightbox" onclick="closeLightbox(event)">
   <span id="lightbox-close" onclick="closeLightbox()">&times;</span>
@@ -193,37 +306,63 @@
 <script>
 const COLORS = ['#7ec8e3','#7ec8aa','#f0c040','#e07070','#b07ee3','#e3a07e','#7eb8e3','#a0e370','#e370b0','#70e3d8'];
 const HEATMAP_COLORS = ['#1e2130','#1a3a1a','#2d6a2d','#4a9a4a','#7ec87e'];
+const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 let charts = {};
 let allRecent = [];
+let filteredRecent = [];
+let visibleCount = 50;
+const PAGE_SIZE = 50;
+const periods = { species: 30, hour: 30, daily: 30 };
+let heatmapCountMap = {};
+let selectedDate = null;   // 'YYYY-MM-DD' or null
+let activeSpeciesFilter = null;
+let starredFilterActive = false;
+let calYear, calMonth;     // currently displayed month in the popup
 
-// ── Stats + Charts (called once on load and on 30s refresh) ──────────────────
+// ── Stats + Charts ───────────────────────────────────────────────────────────
 async function load() {
   const [stats, species, hourly, daily] = await Promise.all([
     fetch('/api/stats').then(r=>r.json()),
-    fetch('/api/species').then(r=>r.json()),
-    fetch('/api/hourly').then(r=>r.json()),
-    fetch('/api/daily').then(r=>r.json()),
+    fetch(`/api/species?days=${periods.species}`).then(r=>r.json()),
+    fetch(`/api/hourly?days=${periods.hour}`).then(r=>r.json()),
+    fetch(`/api/daily?days=${periods.daily}`).then(r=>r.json()),
   ]);
 
-  document.getElementById('stat-today').textContent = stats.today;
+  // Only update today's count when no date is pinned
+  if (!selectedDate) {
+    document.getElementById('stat-today').textContent = stats.today;
+    document.getElementById('stat-today-label').textContent = "Today's Visits";
+  }
   document.getElementById('stat-total').textContent = stats.total;
-  updateBotd(stats);
+  if (!selectedDate) updateBotd(stats);
   document.getElementById('stat-species').textContent = stats.species_count;
 
   Object.values(charts).forEach(c => c.destroy());
   charts = {};
 
+  const speciesColors = species.map((_, i) => COLORS[i % COLORS.length]);
   charts.species = new Chart(document.getElementById('chartSpecies'), {
     type: 'doughnut',
-    data: { labels: species.map(s=>s.name), datasets:[{ data: species.map(s=>s.count), backgroundColor: COLORS }] },
+    data: { labels: species.map(s=>s.name), datasets:[{ data: species.map(s=>s.count), backgroundColor: speciesColors.slice() }] },
     options: {
       onClick(e, els) {
-        if (!els.length) return;
+        if (!els.length) { if (activeSpeciesFilter) clearSpeciesChartFilter(); return; }
         const idx = els[0].index;
         const name = species[idx].name;
+        if (activeSpeciesFilter === name) { clearSpeciesChartFilter(); return; }
         filterBySpecies(name);
       },
-      plugins:{ legend:{ labels:{ color:'#ccc', font:{size:11}, cursor:'pointer' } }, tooltip:{callbacks:{title:l=>`${l[0].label} — click to filter`}} }
+      plugins:{
+        legend:{
+          onClick(e, legendItem) {
+            const name = legendItem.text;
+            if (activeSpeciesFilter === name) { clearSpeciesChartFilter(); return; }
+            filterBySpecies(name);
+          },
+          labels:{ color:'#ccc', font:{size:11} }
+        },
+        tooltip:{callbacks:{title:l=>`${l[0].label} — click to filter`}}
+      }
     }
   });
 
@@ -271,32 +410,40 @@ function updateBotd(stats, dateLabel) {
 }
 
 // ── Table rendering ──────────────────────────────────────────────────────────
+function renderRow(d) {
+  const conf = d.gpt_confidence;
+  const confClass = conf >= 0.7 ? 'conf-high' : conf >= 0.4 ? 'conf-med' : 'conf-low';
+  const confStr = conf != null ? `<span class="${confClass}">${Math.round(conf*100)}%</span>` : '—';
+  const ts = d.timestamp ? d.timestamp.slice(0,16).replace('T',' ') : '—';
+  const sp = d.common_name || d.species || 'Unknown';
+  const photoFile = d.photo_path ? encodeURIComponent(d.photo_path.split('/').pop()) : null;
+  const caption = `${sp} — ${ts}`;
+  const thumb = photoFile
+    ? `<img src="/photo/${photoFile}" class="det-thumb" onclick="openLightbox('/photo/${photoFile}','${caption.replace(/'/g,"&#39;")}')" onerror="this.outerHTML='<div class=det-thumb-placeholder>🐦</div>'">`
+    : `<div class="det-thumb-placeholder">🐦</div>`;
+  const video = d.video_path
+    ? `<a href="/video/${encodeURIComponent(d.video_path.split('/').pop())}" target="_blank" class="text-info small">▶ play</a> <a href="/video/${encodeURIComponent(d.video_path.split('/').pop())}" download class="text-info small" title="Download video">⬇</a>` : '—';
+  const dur = d.visit_duration ? `${Math.round(d.visit_duration)}s` : '—';
+  const spDisplay = d.common_name || d.species || '<span class="text-muted">Unknown</span>';
+  const starIcon = d.starred ? '⭐' : '☆';
+  const starTitle = d.starred ? 'Unstar' : 'Star this detection';
+  const actions = `<button class="btn-act btn-star${d.starred ? ' starred' : ''}" title="${starTitle}" onclick="toggleStar(${d.id},this)"><span>${starIcon}</span></button><button class="btn-act" title="Edit species" onclick="openEditModal(${d.id},'${(d.common_name||'').replace(/'/g,"&#39;")}','${(d.species||'').replace(/'/g,"&#39;")}')" >✏️</button><button class="btn-act" title="Delete" onclick="deleteDetection(${d.id},this)">🗑️</button>`;
+  return `<tr id="det-row-${d.id}"><td><input type="checkbox" class="det-check row-check" data-id="${d.id}" onchange="updateBulkBar()"></td><td>${thumb}</td><td class="small">${ts}</td><td><span class="badge badge-species">${spDisplay}</span></td><td>${confStr}</td><td class="small">${d.spike_score?d.spike_score.toFixed(2):'—'}</td><td class="small">${dur}</td><td>${video}</td><td style="white-space:nowrap">${actions}</td></tr>`;
+}
+
 function renderTable(rows) {
   const tbody = document.getElementById('det-tbody');
   if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-muted small text-center py-3">No detections</td></tr>'; return; }
-  tbody.innerHTML = rows.map(d => {
-    const conf = d.gpt_confidence;
-    const confClass = conf >= 0.7 ? 'conf-high' : conf >= 0.4 ? 'conf-med' : 'conf-low';
-    const confStr = conf != null ? `<span class="${confClass}">${Math.round(conf*100)}%</span>` : '—';
-    const ts = d.timestamp ? d.timestamp.slice(0,16).replace('T',' ') : '—';
-    const sp = d.common_name || d.species || 'Unknown';
-    const photoFile = d.photo_path ? encodeURIComponent(d.photo_path.split('/').pop()) : null;
-    const caption = `${sp} — ${ts}`;
-    const thumb = photoFile
-      ? `<img src="/photo/${photoFile}" class="det-thumb" onclick="openLightbox('/photo/${photoFile}','${caption.replace(/'/g,"&#39;")}')" onerror="this.outerHTML='<div class=det-thumb-placeholder>🐦</div>'">`
-      : `<div class="det-thumb-placeholder">🐦</div>`;
-    const video = d.video_path
-      ? `<a href="/video/${encodeURIComponent(d.video_path.split('/').pop())}" target="_blank" class="text-info small">▶ play</a>` : '—';
-    const dur = d.visit_duration ? `${Math.round(d.visit_duration)}s` : '—';
-    const spDisplay = d.common_name || d.species || '<span class="text-muted">Unknown</span>';
-    const actions = `<button class="btn-act" title="Edit species" onclick="openEditModal(${d.id},'${(d.common_name||'').replace(/'/g,"&#39;")}','${(d.species||'').replace(/'/g,"&#39;")}')" >✏️</button><button class="btn-act" title="Delete" onclick="deleteDetection(${d.id},this)">🗑️</button>`;
-    return `<tr id="det-row-${d.id}"><td><input type="checkbox" class="det-check row-check" data-id="${d.id}" onchange="updateBulkBar()"></td><td>${thumb}</td><td class="small">${ts}</td><td><span class="badge badge-species">${spDisplay}</span></td><td>${confStr}</td><td class="small">${d.spike_score?d.spike_score.toFixed(2):'—'}</td><td class="small">${dur}</td><td>${video}</td><td style="white-space:nowrap">${actions}</td></tr>`;
-  }).join('');
+  tbody.innerHTML = rows.map(renderRow).join('');
 }
 
 async function loadRecent() {
   allRecent = await fetch('/api/recent').then(r=>r.json());
-  renderTable(allRecent);
+  rebuildSpeciesSelect();
+  filteredRecent = allRecent.slice();
+  visibleCount = PAGE_SIZE;
+  renderTable(filteredRecent.slice(0, visibleCount));
+  updateLoadMore();
 }
 
 // ── Filters ──────────────────────────────────────────────────────────────────
@@ -306,17 +453,46 @@ async function filterByHour(hour) {
   document.getElementById('det-title').textContent = `Detections — ${label}`;
   document.getElementById('filter-label').textContent = `Hour: ${label}`;
   document.getElementById('filter-badge').style.display = '';
-  renderTable(rows);
+  filteredRecent = rows;
+  visibleCount = PAGE_SIZE;
+  renderTable(filteredRecent.slice(0, visibleCount));
+  updateLoadMore();
   document.getElementById('det-tbody').closest('.card').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 async function filterBySpecies(name) {
+  activeSpeciesFilter = name;
+  setSpeciesChartHighlight(name);
   const rows = await fetch(`/api/by_species/${encodeURIComponent(name)}`).then(r=>r.json());
   document.getElementById('det-title').textContent = `Detections — ${name}`;
   document.getElementById('filter-label').textContent = `Species: ${name}`;
   document.getElementById('filter-badge').style.display = '';
-  renderTable(rows);
+  filteredRecent = rows;
+  visibleCount = PAGE_SIZE;
+  renderTable(filteredRecent.slice(0, visibleCount));
+  updateLoadMore();
   document.getElementById('det-tbody').closest('.card').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function setSpeciesChartHighlight(name) {
+  if (!charts.species) return;
+  const labels = charts.species.data.labels;
+  const ds = charts.species.data.datasets[0];
+  if (name) {
+    ds.backgroundColor = labels.map((l, i) => {
+      const base = COLORS[i % COLORS.length];
+      return l === name ? base : base + '44';
+    });
+  } else {
+    ds.backgroundColor = labels.map((_, i) => COLORS[i % COLORS.length]);
+  }
+  charts.species.update('none');
+}
+
+function clearSpeciesChartFilter() {
+  activeSpeciesFilter = null;
+  setSpeciesChartHighlight(null);
+  clearFilter();
 }
 
 async function filterByDate(dateStr) {
@@ -324,11 +500,19 @@ async function filterByDate(dateStr) {
     fetch(`/api/by_date/${dateStr}`).then(r=>r.json()),
     fetch(`/api/botd/${dateStr}`).then(r=>r.json()),
   ]);
+  const d = new Date(dateStr + 'T00:00:00');
   const short = dateStr.slice(5);
+  const shortLabel = d.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
   document.getElementById('det-title').textContent = `Detections — ${dateStr}`;
   document.getElementById('filter-label').textContent = `Date: ${dateStr}`;
   document.getElementById('filter-badge').style.display = '';
-  renderTable(rows);
+  filteredRecent = rows;
+  visibleCount = PAGE_SIZE;
+  renderTable(filteredRecent.slice(0, visibleCount));
+  updateLoadMore();
+  // Update Today's Visits card for selected day
+  document.getElementById('stat-today-label').textContent = `Visits — ${shortLabel}`;
+  document.getElementById('stat-today').textContent = rows.length;
   // Update Bird of the Day card for selected day
   if (botd && botd.common_name) {
     updateBotd({
@@ -349,18 +533,258 @@ async function filterByDate(dateStr) {
 }
 
 function clearFilter() {
+  if (activeSpeciesFilter) { activeSpeciesFilter = null; setSpeciesChartHighlight(null); }
   document.getElementById('det-title').textContent = 'Recent Detections';
   document.getElementById('filter-badge').style.display = 'none';
   document.getElementById('botd-card').querySelector('.card-title').textContent = 'Bird of the Day';
-  renderTable(allRecent);
-  // Restore today's botd
-  fetch('/api/stats').then(r=>r.json()).then(updateBotd);
+  document.getElementById('stat-today-label').textContent = "Today's Visits";
+  filteredRecent = allRecent.slice();
+  visibleCount = PAGE_SIZE;
+  renderTable(filteredRecent.slice(0, visibleCount));
+  updateLoadMore();
+  // Restore today's stats
+  fetch('/api/stats').then(r=>r.json()).then(stats => {
+    updateBotd(stats);
+    document.getElementById('stat-today').textContent = stats.today;
+  });
+}
+// ── Calendar ─────────────────────────────────────────────────────────────────
+function toggleCalendar(e) {
+  e.stopPropagation();
+  const popup = document.getElementById('cal-popup');
+  if (popup.classList.contains('open')) { closeCalendar(); return; }
+  // Position below the button
+  const btn = document.getElementById('cal-btn');
+  const rect = btn.getBoundingClientRect();
+  popup.style.top  = (rect.bottom + 6) + 'px';
+  popup.style.left = Math.min(rect.left, window.innerWidth - 292) + 'px';
+  // Init to selected month or current month
+  const base = selectedDate ? new Date(selectedDate + 'T00:00:00') : new Date();
+  calYear  = base.getFullYear();
+  calMonth = base.getMonth();
+  renderCalendar();
+  popup.classList.add('open');
 }
 
+function closeCalendar() {
+  document.getElementById('cal-popup').classList.remove('open');
+}
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0;  calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  document.getElementById('cal-title').textContent = `${MONTHS_LONG[calMonth]} ${calYear}`;
+  const grid = document.getElementById('cal-grid');
+  const todayStr = new Date().toISOString().slice(0,10);
+  // Day-of-week headers (S M T W T F S)
+  const DOW = ['S','M','T','W','T','F','S'];
+  let html = DOW.map(d => `<div class="cal-dow">${d}</div>`).join('');
+  // First day of month (0=Sun)
+  const firstDow = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  // Empty cells before first day
+  for (let i = 0; i < firstDow; i++) html += '<div class="cal-empty"></div>';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const count   = heatmapCountMap[dateStr] || 0;
+    const isToday    = dateStr === todayStr;
+    const isSelected = dateStr === selectedDate;
+    const isFuture   = dateStr > todayStr;
+    let cls = 'cal-day';
+    if (isToday)    cls += ' cal-today';
+    if (isSelected) cls += ' cal-selected';
+    if (isFuture)   cls += ' cal-future';
+    if (count > 0)  cls += ' cal-has-visits';
+    const clickAttr = isFuture ? '' : `onclick="calSelectDate('${dateStr}')" title="${count} visit${count!==1?'s':''}"`;
+    html += `<div class="${cls}" ${clickAttr}><div class="cal-num">${day}</div><div class="cal-dot"></div></div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function calSelectDate(dateStr) {
+  selectedDate = dateStr;
+  const d = new Date(dateStr + 'T00:00:00');
+  document.getElementById('cal-btn-label').textContent = d.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+  document.getElementById('cal-btn').classList.add('active');
+  document.getElementById('active-date-text').textContent = dateStr;
+  document.getElementById('active-date-badge').classList.add('visible');
+  closeCalendar();
+  filterByDate(dateStr);
+}
+
+function onDatePick(dateStr) { calSelectDate(dateStr); }
+
+function stepDate(dir) {
+  const base = selectedDate || new Date().toISOString().slice(0,10);
+  const d = new Date(base + 'T00:00:00');
+  d.setDate(d.getDate() + dir);
+  calSelectDate(d.toISOString().slice(0,10));
+}
+
+function goToday() {
+  calSelectDate(new Date().toISOString().slice(0,10));
+}
+
+function clearDateFilter() {
+  selectedDate = null;
+  document.getElementById('active-date-badge').classList.remove('visible');
+  document.getElementById('cal-btn-label').textContent = 'Pick a date';
+  document.getElementById('cal-btn').classList.remove('active');
+  closeCalendar();
+  clearFilter();
+}
+
+// Close calendar on outside click
+document.addEventListener('click', e => {
+  if (!document.getElementById('cal-popup').contains(e.target) &&
+      e.target !== document.getElementById('cal-btn') &&
+      !document.getElementById('cal-btn').contains(e.target)) {
+    closeCalendar();
+  }
+});
+
+// ── Period selector ───────────────────────────────────────────────────────────
+async function setPeriod(chart, days, btn) {
+  periods[chart] = days;
+  // Update active pill
+  document.querySelectorAll(`#pills-${chart} .period-pill`).forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  // Refetch only the affected chart
+  if (chart === 'species') {
+    const species = await fetch(`/api/species?days=${days}`).then(r=>r.json());
+    charts.species.destroy();
+    charts.species = new Chart(document.getElementById('chartSpecies'), {
+      type: 'doughnut',
+      data: { labels: species.map(s=>s.name), datasets:[{ data: species.map(s=>s.count), backgroundColor: COLORS }] },
+      options: {
+        onClick(e, els) { if (!els.length) return; filterBySpecies(species[els[0].index].name); },
+        plugins:{ legend:{ labels:{ color:'#ccc', font:{size:11} } }, tooltip:{callbacks:{title:l=>`${l[0].label} — click to filter`}} }
+      }
+    });
+  } else if (chart === 'hour') {
+    const hourly = await fetch(`/api/hourly?days=${days}`).then(r=>r.json());
+    const hours = Array.from({length:24},(_,i)=>i);
+    const hMap = Object.fromEntries(hourly.map(h=>[h.hour, h.count]));
+    charts.hour.destroy();
+    charts.hour = new Chart(document.getElementById('chartHour'), {
+      type: 'bar',
+      data: { labels: hours.map(h=>String(h).padStart(2,'0')+':00'), datasets:[{ data: hours.map(h=>hMap[h]||0), backgroundColor:'#7ec8e3', borderRadius:3 }] },
+      options: {
+        onClick(e, els) { if (!els.length) return; filterByHour(els[0].index); },
+        plugins:{legend:{display:false},tooltip:{callbacks:{title:l=>`${l[0].label} — click to filter`}}},
+        scales:{ x:{ ticks:{color:'#888',maxRotation:45,font:{size:10}}, grid:{color:'#2a2d3a'} }, y:{ ticks:{color:'#888'}, grid:{color:'#2a2d3a'} } }
+      }
+    });
+  } else if (chart === 'daily') {
+    const daily = await fetch(`/api/daily?days=${days}`).then(r=>r.json());
+    charts.daily.destroy();
+    charts.daily = new Chart(document.getElementById('chartDaily'), {
+      type: 'line',
+      data: { labels: daily.map(d=>d.day.slice(5)), datasets:[{ data: daily.map(d=>d.count), borderColor:'#7ec8aa', backgroundColor:'rgba(126,200,170,0.15)', fill:true, tension:0.3, pointRadius:3 }] },
+      options: { plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:'#888',font:{size:10}}, grid:{color:'#2a2d3a'} }, y:{ ticks:{color:'#888'}, grid:{color:'#2a2d3a'} } } }
+    });
+  }
+}
+
+// ── Species quick-filter (table) ──────────────────────────────────────────────
+function rebuildSpeciesSelect() {
+  const sel = document.getElementById('species-select');
+  const current = sel.value;
+  const names = [...new Set(allRecent.map(d => d.common_name || d.species || 'Unknown'))].sort();
+  sel.innerHTML = '<option value="">All species</option>' +
+    names.map(n => `<option${n===current?' selected':''}>${n}</option>`).join('');
+}
+
+function applySpeciesFilter() {
+  const text = document.getElementById('species-text-filter').value.toLowerCase();
+  const sel  = document.getElementById('species-select').value;
+  filteredRecent = allRecent.filter(d => {
+    const name = (d.common_name || d.species || '').toLowerCase();
+    return (!text || name.includes(text)) &&
+           (!sel || (d.common_name || d.species) === sel) &&
+           (!starredFilterActive || d.starred);
+  });
+  visibleCount = PAGE_SIZE;
+  renderTable(filteredRecent.slice(0, visibleCount));
+  updateLoadMore();
+}
+
+function toggleStarredFilter() {
+  starredFilterActive = !starredFilterActive;
+  const btn = document.getElementById('starred-filter-btn');
+  btn.textContent = starredFilterActive ? '⭐ Starred' : '☆ Starred';
+  btn.classList.toggle('active', starredFilterActive);
+  applySpeciesFilter();
+}
+
+async function toggleStar(id, btn) {
+  const res = await fetch(`/api/detection/${id}/star`, {method: 'POST'}).then(r => r.json());
+  const starred = res.starred;
+  btn.classList.toggle('starred', starred);
+  btn.title = starred ? 'Unstar' : 'Star this detection';
+  btn.querySelector('span').textContent = starred ? '⭐' : '☆';
+  const det = allRecent.find(d => d.id === id);
+  if (det) det.starred = starred ? 1 : 0;
+  // If starred filter is active and we just unstarred, re-apply filter
+  if (starredFilterActive && !starred) applySpeciesFilter();
+}
+
+function clearSpeciesFilter() {
+  document.getElementById('species-text-filter').value = '';
+  document.getElementById('species-select').value = '';
+  if (starredFilterActive) {
+    starredFilterActive = false;
+    const btn = document.getElementById('starred-filter-btn');
+    btn.textContent = '☆ Starred';
+    btn.classList.remove('active');
+  }
+  filteredRecent = allRecent.slice();
+  visibleCount = PAGE_SIZE;
+  renderTable(filteredRecent.slice(0, visibleCount));
+  updateLoadMore();
+}
+
+// ── Load more ──────────────────────────────────────────────────────────────────
+function loadMore() {
+  visibleCount = Math.min(visibleCount + PAGE_SIZE, filteredRecent.length);
+  renderTable(filteredRecent.slice(0, visibleCount));
+  updateLoadMore();
+}
+
+function updateLoadMore() {
+  const wrap = document.getElementById('load-more-wrap');
+  const total = filteredRecent.length;
+  const showing = Math.min(visibleCount, total);
+  if (total <= PAGE_SIZE) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  document.getElementById('load-more-btn').style.display = showing >= total ? 'none' : '';
+  document.getElementById('load-more-count').textContent = `Showing ${showing} of ${total} detections`;
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const rows = filteredRecent;
+  if (!rows.length) return;
+  const headers = ['id','timestamp','common_name','species','gpt_confidence','spike_score','visit_duration'];
+  const escape = v => v == null ? '' : String(v).replace(/"/g, '""');
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => `"${escape(r[h])}"`).join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `detections_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 // ── Heatmap ──────────────────────────────────────────────────────────────────
 async function buildHeatmap() {
   const data = await fetch('/api/heatmap').then(r=>r.json());
-  const countMap = Object.fromEntries(data.map(d=>[d.day, d.count]));
+  heatmapCountMap = Object.fromEntries(data.map(d=>[d.day, d.count]));
+  const countMap = heatmapCountMap;
   const max = Math.max(...data.map(d=>d.count), 1);
 
   function colorFor(count) {
@@ -411,7 +835,7 @@ async function buildHeatmap() {
       cell.style.background = isFuture ? 'transparent' : colorFor(count);
       if (!isFuture) {
         cell.title = `${dateStr}: ${count} visit${count!==1?'s':''}`;
-        if (count > 0) cell.onclick = () => filterByDate(dateStr);
+        if (count > 0) cell.onclick = () => calSelectDate(dateStr);
       }
       col.appendChild(cell);
       cur.setDate(cur.getDate() + 1);
@@ -426,7 +850,13 @@ function tick() { document.getElementById('clock').textContent = new Date().toLo
 tick(); setInterval(tick, 1000);
 
 Promise.all([load(), loadRecent(), buildHeatmap()]);
-setInterval(() => { load(); loadRecent(); }, 30000);
+setInterval(() => {
+  // Don't refresh while the user is editing or a lightbox is open
+  const editing = document.getElementById('edit-modal-bg').classList.contains('open');
+  const viewing = document.getElementById('lightbox').classList.contains('open');
+  if (editing || viewing) return;
+  load(); loadRecent();
+}, 30000);
 
 // ── Delete & Edit ────────────────────────────────────────────────────────────
 async function deleteDetection(id, btn) {
@@ -436,6 +866,8 @@ async function deleteDetection(id, btn) {
   if (r.ok) {
     document.getElementById(`det-row-${id}`)?.remove();
     allRecent = allRecent.filter(d => d.id !== id);
+    filteredRecent = filteredRecent.filter(d => d.id !== id);
+    updateLoadMore();
     load(); // refresh stat counters
   } else {
     btn.disabled = false;
@@ -495,9 +927,12 @@ async function saveEdit() {
       for (const id of ids) {
         const idx = allRecent.findIndex(d => d.id === id);
         if (idx >= 0) { allRecent[idx].common_name = common_name; if (species) allRecent[idx].species = species; }
+        const fi = filteredRecent.findIndex(d => d.id === id);
+        if (fi >= 0) { filteredRecent[fi].common_name = common_name; if (species) filteredRecent[fi].species = species; }
         const row = document.getElementById(`det-row-${id}`);
         if (row) { const badge = row.querySelector('.badge-species'); if (badge) badge.textContent = common_name; }
       }
+      rebuildSpeciesSelect();
       clearSelection();
       load();
     } else {
@@ -513,10 +948,22 @@ async function saveEdit() {
     });
     if (r.ok) {
       closeEditModal();
+      // Update local cache
       const idx = allRecent.findIndex(d => d.id === _editId);
       if (idx >= 0) { allRecent[idx].common_name = common_name; if (species) allRecent[idx].species = species; }
+      const fi = filteredRecent.findIndex(d => d.id === _editId);
+      if (fi >= 0) { filteredRecent[fi].common_name = common_name; if (species) filteredRecent[fi].species = species; }
+      // Re-render the row so badge + edit-button args are both current
       const row = document.getElementById(`det-row-${_editId}`);
-      if (row) { const badge = row.querySelector('.badge-species'); if (badge) badge.textContent = common_name; }
+      if (row) {
+        const det = allRecent.find(d => d.id === _editId);
+        if (det) {
+          const tmp = document.createElement('tbody');
+          tmp.innerHTML = renderRow(det);
+          row.replaceWith(tmp.firstElementChild);
+        }
+      }
+      rebuildSpeciesSelect();
       load();
     } else {
       alert('Save failed');
@@ -566,7 +1013,9 @@ async function bulkDelete() {
       document.getElementById(`det-row-${id}`)?.remove();
     }
     allRecent = allRecent.filter(d => !ids.includes(d.id));
+    filteredRecent = filteredRecent.filter(d => !ids.includes(d.id));
     clearSelection();
+    updateLoadMore();
     load();
   } else {
     alert('Bulk delete failed');

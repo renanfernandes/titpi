@@ -5,12 +5,16 @@ Usage: python3 reidentify.py [YYYY-MM-DD]   (defaults to today)
 import sys
 import sqlite3
 import datetime
+import os
+
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+sys.path.insert(0, _ROOT)
+import database
 from bird_id import identify_image
 
-DB_PATH = "/home/titpi/titpi/detections/detections.db"
 date_str = sys.argv[1] if len(sys.argv) > 1 else datetime.date.today().isoformat()
 
-conn = sqlite3.connect(DB_PATH)
+conn = sqlite3.connect(database.DB_PATH)
 conn.row_factory = sqlite3.Row
 
 rows = conn.execute(

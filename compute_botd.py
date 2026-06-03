@@ -19,6 +19,40 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import database
 
 
+def score_species(counts, rows):
+    """Return weighted score per species.
+
+    Score = visit_count + (starred_detections * 3).
+    Stars act as a quality signal: each starred detection adds +3, so
+    a species needs ~3 more raw visits to overcome each star another species has.
+    """
+    star_bonus = {}
+    for r in rows:
+        name = r.get("common_name") or r.get("species")
+        if not name or name.lower() in ("unknown", "none"):
+            continue
+        if r.get("starred"):
+            star_bonus[name] = star_bonus.get(name, 0) + 3
+    return {name: counts[name] + star_bonus.get(name, 0) for name in counts}
+
+
+def best_photo(rows, winner):
+    """Return the best photo row for the winning species.
+
+    Starred photos take priority; confidence breaks ties among equal-starred photos.
+    """
+    candidates = [
+        r for r in rows
+        if (r.get("common_name") or r.get("species")) == winner
+        and r.get("photo_path")
+    ]
+    candidates.sort(
+        key=lambda r: (r.get("starred") or 0, r.get("gpt_confidence") or 0),
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
 def compute(date_str=None):
     import datetime
     if date_str is None:
@@ -41,28 +75,30 @@ def compute(date_str=None):
         print(f"No identified species for {date_str}.")
         return
 
+    weighted = score_species(counts, rows)
+
     # Find species seen for the first time ever (not in DB before today)
     known_before = database.get_known_species(before_date=date_str)
     new_species = {name for name in counts if name not in known_before}
 
     if new_species:
-        # Pick the new species with the most visits today
-        winner = max(new_species, key=lambda n: counts[n])
+        # Pick the new species with the highest weighted score today
+        winner = max(new_species, key=lambda n: weighted[n])
         first_time = True
     else:
-        winner = max(counts, key=counts.get)
+        winner = max(weighted, key=weighted.get)
         first_time = False
 
     visit_count = counts[winner]
 
-    # Find best photo: highest gpt_confidence among winner's detections
+    # Best photo: starred photos take priority; break ties with gpt_confidence
     candidates = [
         r for r in rows
         if (r.get("common_name") or r.get("species")) == winner
         and r.get("photo_path")
     ]
-    candidates.sort(key=lambda r: r.get("gpt_confidence") or 0, reverse=True)
-    best = candidates[0] if candidates else None
+    candidates.sort(key=lambda r: (r.get("starred") or 0, r.get("gpt_confidence") or 0), reverse=True)
+    best = best_photo(rows, winner)
 
     photo_path = best["photo_path"] if best else None
     species = best.get("species") if best else winner

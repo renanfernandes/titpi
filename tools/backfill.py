@@ -13,14 +13,15 @@ import sys
 import sqlite3
 import time
 
-# Ensure we can import project modules
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Ensure we can import project modules from the parent directory
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+sys.path.insert(0, _ROOT)
 import database
 from bird_id import identify_image
 
 database.init_db()
 
-DETECTIONS_DIR = database.DB_PATH.replace("detections.db", "")
+DETECTIONS_DIR = os.path.dirname(database.DB_PATH)
 # Regex: optional label prefix + timestamp YYYYMMDD-HHMMSS (no trailing _N)
 PATTERN = re.compile(r'^(?:.+_)?(\d{8}-\d{6})\.jpg$')
 

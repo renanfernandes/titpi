@@ -47,6 +47,11 @@ def init_db():
                 visit_count INTEGER
             )
         """)
+        # Migrate: add starred column to existing databases
+        try:
+            conn.execute("ALTER TABLE detections ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass  # column already exists
         conn.commit()
 
 
@@ -83,34 +88,55 @@ def get_today(date_str):
 
 def get_species_counts(days=30):
     with _connect() as conn:
-        rows = conn.execute("""
-            SELECT COALESCE(common_name, 'Unknown') as name, COUNT(*) as count
-            FROM detections
-            WHERE timestamp >= datetime('now', ?)
-            GROUP BY name ORDER BY count DESC
-        """, (f"-{days} days",)).fetchall()
+        if days:
+            rows = conn.execute("""
+                SELECT COALESCE(common_name, 'Unknown') as name, COUNT(*) as count
+                FROM detections
+                WHERE timestamp >= datetime('now', ?)
+                GROUP BY name ORDER BY count DESC
+            """, (f"-{days} days",)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT COALESCE(common_name, 'Unknown') as name, COUNT(*) as count
+                FROM detections
+                GROUP BY name ORDER BY count DESC
+            """).fetchall()
     return [dict(r) for r in rows]
 
 
 def get_hourly_counts(days=30):
     with _connect() as conn:
-        rows = conn.execute("""
-            SELECT CAST(strftime('%H', timestamp) AS INTEGER) as hour, COUNT(*) as count
-            FROM detections
-            WHERE timestamp >= datetime('now', ?)
-            GROUP BY hour ORDER BY hour
-        """, (f"-{days} days",)).fetchall()
+        if days:
+            rows = conn.execute("""
+                SELECT CAST(strftime('%H', timestamp) AS INTEGER) as hour, COUNT(*) as count
+                FROM detections
+                WHERE timestamp >= datetime('now', ?)
+                GROUP BY hour ORDER BY hour
+            """, (f"-{days} days",)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT CAST(strftime('%H', timestamp) AS INTEGER) as hour, COUNT(*) as count
+                FROM detections
+                GROUP BY hour ORDER BY hour
+            """).fetchall()
     return [dict(r) for r in rows]
 
 
 def get_daily_counts(days=30):
     with _connect() as conn:
-        rows = conn.execute("""
-            SELECT date(timestamp) as day, COUNT(*) as count
-            FROM detections
-            WHERE timestamp >= date('now', ?)
-            GROUP BY day ORDER BY day
-        """, (f"-{days} days",)).fetchall()
+        if days:
+            rows = conn.execute("""
+                SELECT date(timestamp) as day, COUNT(*) as count
+                FROM detections
+                WHERE timestamp >= date('now', ?)
+                GROUP BY day ORDER BY day
+            """, (f"-{days} days",)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT date(timestamp) as day, COUNT(*) as count
+                FROM detections
+                GROUP BY day ORDER BY day
+            """).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -241,6 +267,28 @@ def update_detection_species(detection_id, common_name, species=None):
             (common_name, species, detection_id)
         )
         conn.commit()
+
+
+def toggle_star(detection_id):
+    """Toggle the starred flag for a detection. Returns new bool value or None if not found."""
+    with _connect() as conn:
+        cur = conn.execute(
+            "UPDATE detections SET starred = 1 - starred WHERE id = ?", (detection_id,)
+        )
+        conn.commit()
+        if cur.rowcount == 0:
+            return None
+        row = conn.execute("SELECT starred FROM detections WHERE id = ?", (detection_id,)).fetchone()
+    return bool(row["starred"]) if row else None
+
+
+def get_starred():
+    """Return all starred detections ordered by most recent."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM detections WHERE starred = 1 ORDER BY timestamp DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_known_species(before_date=None):

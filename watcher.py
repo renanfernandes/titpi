@@ -8,10 +8,10 @@ import numpy as np
 from collections import deque
 import statistics
 from picamera2 import Picamera2
-from picamera2.devices import IMX500
 from picamera2.encoders import H264Encoder
 from picamera2.outputs import FfmpegOutput
-from notifier import send_detection_email
+#from notifier import send_detection_email
+from notifier_lcd import send_detection_email
 import threading as _threading
 from bird_id import identify_image
 
@@ -38,6 +38,7 @@ with open(CONFIG_PATH) as _f:
     _cfg = json.load(_f)["camera"]
 
 DEBUG = "--debug" in sys.argv
+CAMERA_MODE   = _cfg.get("mode", "imx500")  # "imx500" or "motion"
 CONFIDENCE    = _cfg.get("confidence_threshold", 0.35)
 SAVE_DIR      = _cfg.get("save_directory", "/home/titpi/titpi/detections")
 MODEL_PATH    = _cfg.get("model_path")
@@ -52,6 +53,9 @@ LOG_PATH      = _cfg.get("log_file", os.path.join(SAVE_DIR, "watcher.log"))
 TARGET_LABELS = set(_cfg.get("target_labels", ["bird"]))
 SPIKE_THRESHOLD = _cfg.get("spike_threshold", 0.20)
 BASELINE_FRAMES = _cfg.get("baseline_frames", 60)
+# Motion mode settings
+MOTION_THRESHOLD = _cfg.get("motion_threshold", 5.0)  # mean pixel diff to count as motion
+MOTION_MIN_AREA  = _cfg.get("motion_min_area", 0.01)   # fraction of frame that must change
 
 os.makedirs(SAVE_DIR, exist_ok=True)
 
@@ -90,18 +94,35 @@ COCO = {
 }
 
 # --- Camera setup ---
-log.info("Initializing IMX500...")
-imx500 = IMX500(MODEL_PATH)
-picam2 = Picamera2(imx500.camera_num)
-preview_cfg = picam2.create_preview_configuration(main={"size": (640, 480)})
+imx500 = None
+prev_frame = None
+
+if CAMERA_MODE == "imx500":
+    from picamera2.devices import IMX500
+    log.info("Initializing IMX500...")
+    imx500 = IMX500(MODEL_PATH)
+    picam2 = Picamera2(imx500.camera_num)
+else:
+    log.info("Initializing Camera Module 3 (motion mode)...")
+    picam2 = Picamera2()
+
+preview_cfg = picam2.create_preview_configuration(
+    main={"size": (640, 480)},
+    lores={"size": (320, 240), "format": "YUV420"} if CAMERA_MODE == "motion" else {},
+)
 still_cfg = picam2.create_still_configuration(main={"size": (2028, 1520)})
 picam2.configure(preview_cfg)
 picam2.start()
+if CAMERA_MODE == "motion":
+    from libcamera import controls
+    picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
 time.sleep(2)
 database.init_db()
 
 log.info("--- Watcher Active ---")
-log.info(f"Model: {os.path.basename(MODEL_PATH)}")
+log.info(f"Mode: {CAMERA_MODE}")
+if CAMERA_MODE == "imx500":
+    log.info(f"Model: {os.path.basename(MODEL_PATH)}")
 log.info(f"Targets: {', '.join(TARGET_LABELS)} | Threshold: {CONFIDENCE}")
 log.info(f"Save: {SAVE_DIR} | Log: {LOG_PATH}")
 
@@ -154,6 +175,38 @@ def get_top_score(np_outputs):
     return COCO.get(int(classes[best_i]), "?"), float(scores[best_i])
 
 
+def get_motion_score():
+    """Compute motion magnitude from consecutive lores frames. Returns (label, score)."""
+    global prev_frame
+    lores = picam2.capture_array("lores")
+    # Use only Y channel (first 320x240 bytes of YUV420)
+    gray = lores[:240, :320].astype(np.float32) if lores.ndim == 3 else lores.astype(np.float32)
+    if len(gray.shape) == 3:
+        gray = gray[:, :, 0]
+
+    if prev_frame is None:
+        prev_frame = gray
+        return None, 0.0
+
+    diff = np.abs(gray - prev_frame)
+    prev_frame = gray
+
+    # Fraction of pixels that changed significantly
+    changed = np.count_nonzero(diff > (MOTION_THRESHOLD * 255 / 100)) / diff.size
+    # Mean intensity change as a 0–1 score
+    mean_change = float(diff.mean()) / 255.0
+
+    # Combined score: needs both enough area changing and enough magnitude
+    if changed < MOTION_MIN_AREA:
+        return None, 0.0
+
+    score = min(1.0, mean_change * 10)  # scale up to usable range
+    if DEBUG and int(time.time()) % 5 == 0:
+        log.debug(f"Motion: changed={changed:.3f} mean={mean_change:.4f} score={score:.2f}")
+
+    return "motion", score
+
+
 def capture_photo(path):
     """Capture a high-res still. Falls back to preview resolution on failure."""
     try:
@@ -161,6 +214,9 @@ def capture_photo(path):
         picam2.stop()
         picam2.configure(preview_cfg)
         picam2.start()
+        if CAMERA_MODE == "motion":
+            from libcamera import controls
+            picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         time.sleep(1)
         # Flush stale frames so encoder starts with clean timestamps
         for _ in range(5):
@@ -214,12 +270,17 @@ def record_video(path, label, ts, baseline_median=0.0):
                     pass
                 last_photo = time.time()
 
-            signal.alarm(15)
-            meta = picam2.capture_metadata()
-            out = imx500.get_outputs(meta, add_batch=True)
-            signal.alarm(0)
-            if out is not None:
-                _, score = get_top_score(out)
+            if CAMERA_MODE == "imx500":
+                signal.alarm(15)
+                meta = picam2.capture_metadata()
+                out = imx500.get_outputs(meta, add_batch=True)
+                signal.alarm(0)
+                if out is not None:
+                    _, score = get_top_score(out)
+                    if score > baseline_median:
+                        last_activity = time.time()
+            else:
+                _, score = get_motion_score()
                 if score > baseline_median:
                     last_activity = time.time()
 
@@ -293,25 +354,31 @@ FROZEN_TIMEOUT = 120  # exit if model output unchanged for 2 minutes
 
 try:
     while True:
-        signal.alarm(15)
-        meta = picam2.capture_metadata()
-        out = imx500.get_outputs(meta, add_batch=True)
-        signal.alarm(0)
+        if CAMERA_MODE == "imx500":
+            signal.alarm(15)
+            meta = picam2.capture_metadata()
+            out = imx500.get_outputs(meta, add_batch=True)
+            signal.alarm(0)
 
-        if out is None:
-            time.sleep(0.1)
-            continue
+            if out is None:
+                time.sleep(0.1)
+                continue
 
-        # Detect frozen AI pipeline: same output for too long
-        sig = bytes(out[1][0].data) if hasattr(out[1][0], 'data') else out[1][0].tobytes()
-        if sig != last_output_sig:
-            last_output_sig = sig
-            last_output_change = time.time()
-        elif time.time() - last_output_change > FROZEN_TIMEOUT:
-            log.error(f"AI pipeline frozen for {FROZEN_TIMEOUT}s, exiting for restart...")
-            os._exit(1)
+            # Detect frozen AI pipeline: same output for too long
+            sig = bytes(out[1][0].data) if hasattr(out[1][0], 'data') else out[1][0].tobytes()
+            if sig != last_output_sig:
+                last_output_sig = sig
+                last_output_change = time.time()
+            elif time.time() - last_output_change > FROZEN_TIMEOUT:
+                log.error(f"AI pipeline frozen for {FROZEN_TIMEOUT}s, exiting for restart...")
+                os._exit(1)
 
-        top_label, top_score = get_top_score(out)
+            top_label, top_score = get_top_score(out)
+        else:
+            top_label, top_score = get_motion_score()
+            if top_label is None:
+                time.sleep(0.1)
+                continue
 
         # Update rolling baseline (frozen while a spike is active)
         if spike_streak == 0 and top_score > 0:
