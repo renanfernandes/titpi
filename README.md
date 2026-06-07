@@ -1,5 +1,6 @@
 # :bird: TitPi: AI Bird Feeder Camera
 
+This is a fun project I've been working for a while. Keeping track on the beautiful birds in the neighborhood!
 A Raspberry Pi Zero 2W + Sony IMX500 AI Camera that watches your bird feeder 24/7, identifies every visitor by species, and serves a live dashboard — no cloud, no subscription.
 
 Named after the **Tufted Titmouse** (**Tit**mouse + Raspberry **Pi** = TitPi). The project started because smart feeders like Birdfy charge a subscription for species detection and have painful apps. So I built something better.
