@@ -1,4 +1,4 @@
-# TitPi — AI Bird Feeder Camera
+# :bird: TitPi: AI Bird Feeder Camera
 
 A Raspberry Pi Zero 2W + Sony IMX500 AI Camera that watches your bird feeder 24/7, identifies every visitor by species, and serves a live dashboard — no cloud, no subscription.
 
