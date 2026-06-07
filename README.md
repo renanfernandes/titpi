@@ -8,7 +8,9 @@ Named after the **Tufted Titmouse** (**Tit**mouse + Raspberry **Pi** = TitPi). T
 
 ---
 
-![TitPi setup — feeder at the window, Pi + AI Camera watching from inside](/images/titpi-setup.jpg)
+![TitPi setup — feeder at the window, Pi + AI Camera watching from inside](images/setup.jpg)
+
+![A Bluebird at the feeder while TitPi monitors from the windowsill](images/setup2.jpg)
 
 ---
 
@@ -52,9 +54,9 @@ The IMX500 runs neural network inference directly on the sensor chip — the Pi 
 
 ## Dashboard
 
-![TitPi dashboard — visit counts, Bird of the Day, and species breakdown](https://raw.githubusercontent.com/renanfernandes/titpi/refs/heads/main/images/dashboard.png)
+![TitPi dashboard — visit counts, Bird of the Day, and species breakdown](images/dashboard.png)
 
-![TitPi dashboard — activity heatmap and detection table](https://raw.githubusercontent.com/renanfernandes/titpi/main/images/dashboard2.png)
+![TitPi dashboard — activity heatmap and detection table](images/dashboard2.png)
 
 ## Hardware
 
