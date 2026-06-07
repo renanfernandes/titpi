@@ -52,9 +52,9 @@ The IMX500 runs neural network inference directly on the sensor chip — the Pi 
 
 ## Dashboard
 
-![TitPi dashboard — visit counts, Bird of the Day, and species breakdown](https://raw.githubusercontent.com/renanfernandes/titpi/main/docs/dashboard.png)
+![TitPi dashboard — visit counts, Bird of the Day, and species breakdown](https://raw.githubusercontent.com/renanfernandes/titpi/main/images/dashboard.png)
 
-![TitPi dashboard — activity heatmap and detection table](https://raw.githubusercontent.com/renanfernandes/titpi/main/docs/dashboard2.png)
+![TitPi dashboard — activity heatmap and detection table](https://raw.githubusercontent.com/renanfernandes/titpi/main/images/dashboard2.png)
 
 ## Hardware
 
