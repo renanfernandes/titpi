@@ -70,6 +70,8 @@ The IMX500 runs neural network inference directly on the sensor chip — the Pi 
 
 The case is designed to mount the Pi and the IMX500 together on a windowsill, pointing through the glass at the feeder. Keeping the electronics inside means no weather exposure and a direct power cable to an outlet.
 
+Case design by **[Hanz](https://makerworld.com/en/@Hanz_3D_zz)** — [Raspberry Pi Zero Case + Camera V3/V2 for Tripod](https://makerworld.com/en/models/1357960-raspberry-pi-zero-case-camera-v3-v2-for-tripod?from=search#profileId-1401984) on MakerWorld. STL files are included in the [`3d model/`](3d%20model/) directory.
+
 **OS:** Raspberry Pi OS Bookworm 64-bit
 
 
