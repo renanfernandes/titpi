@@ -1,6 +1,39 @@
 # TitPi — AI Bird Feeder Camera
 
-An edge-AI bird surveillance system built on **Raspberry Pi Zero 2W** and the **Sony IMX500** AI camera. Detects visitors in real time using on-chip inference, identifies species with GPT-4o vision, and serves a live analytics dashboard.
+A Raspberry Pi Zero 2W + Sony IMX500 AI Camera that watches your bird feeder 24/7, identifies every visitor by species, and serves a live dashboard — no cloud, no subscription.
+
+Named after the **Tufted Titmouse** (**Tit**mouse + Raspberry **Pi** = TitPi). The project started because smart feeders like Birdfy charge a subscription for species detection and have painful apps. So I built something better.
+
+📖 **Full story & deep-dive:** [renan.com/blog/titpi-ai-bird-feeder](https://renan.com/blog/titpi-ai-bird-feeder)
+
+---
+
+![TitPi setup — feeder at the window, Pi + AI Camera watching from inside](/images/titpi-setup.jpg)
+
+---
+
+## How It Works
+
+```
+IMX500 (on-chip COCO detection)
+  │
+  ▼
+watcher.py ── spike detection + baseline calibration
+  │             captures photo + video on confirmation
+  ▼
+bird_id.py ── local TFLite classifier (AIY Birds V1, 964 species)
+  │             ↓ confident (≥30%)? → done
+  │             ↓ uncertain? → GPT-4o-mini fallback
+  │             applies species aliases
+  ▼
+database.py ── SQLite (detections + bird_of_day tables)
+  │
+  ├─▶ notifier.py      email alerts (photo + video link/attachment)
+  ├─▶ compute_botd.py   daily "Bird of the Day" (7 PM) + photo copy
+  └─▶ web.py            Flask dashboard on port 8080
+```
+
+The IMX500 runs neural network inference directly on the sensor chip — the Pi barely wakes up until something interesting happens. Detection score spikes above a rolling baseline trigger a capture. A two-stage pipeline then identifies the species: fast local TFLite model first, GPT-4o-mini fallback for uncertain or tricky shots.
 
 ## Features
 
@@ -17,36 +50,27 @@ An edge-AI bird surveillance system built on **Raspberry Pi Zero 2W** and the **
 - **Auto-recovery** — systemd services with crash restart + frozen-pipeline detection (`os._exit` on camera hang)
 - **Dual camera support** — works with IMX500 (AI Camera, on-chip detection) or Camera Module 3 (motion detection mode)
 
+## Dashboard
+
+![TitPi dashboard — visit counts, Bird of the Day, and species breakdown](https://raw.githubusercontent.com/renanfernandes/titpi/main/docs/dashboard.png)
+
+![TitPi dashboard — activity heatmap and detection table](https://raw.githubusercontent.com/renanfernandes/titpi/main/docs/dashboard2.png)
+
 ## Hardware
 
-| Component | Model |
-|-----------|-------|
-| Board | Raspberry Pi Zero 2W (or Pi 3/4) |
-| Camera | Sony IMX500 (AI Camera) **or** Raspberry Pi Camera Module 3 |
-| OS | Raspberry Pi OS Bookworm 64-bit |
+| Component | Model | Approx. Cost |
+|-----------|-------|-------------|
+| Board | Raspberry Pi Zero 2W (or Pi 3/4) | ~$15 |
+| Camera | Sony IMX500 (AI Camera) **or** Raspberry Pi Camera Module 3 | ~$70 |
+| MicroSD | 32 GB+ | ~$8 |
+| Case | 3D printed ([files in `3d model/`](3d%20model/)) | ~$2 in filament |
+| **Total** | | **~$95** |
 
-## Architecture
+The case is designed to mount the Pi and the IMX500 together on a windowsill, pointing through the glass at the feeder. Keeping the electronics inside means no weather exposure and a direct power cable to an outlet.
 
-```
-IMX500 (on-chip COCO detection)
-  │
-  ▼
-watcher.py ── spike detection + baseline calibration
-  │             captures photo + video on confirmation
-  ▼
-bird_id.py ── local TFLite classifier (AIY Birds V1)
-  │             ↓ confident (≥30%)? → done
-  │             ↓ uncertain? → GPT-4o-mini fallback
-  │             applies species aliases
-  ▼
-database.py ── SQLite (detections + bird_of_day tables)
-  │
-  ├─▶ notifier.py      email alerts (photo + video link/attachment)
-  ├─▶ compute_botd.py   daily "Bird of the Day" (7 PM) + photo copy
-  └─▶ web.py            Flask dashboard on port 8080
-```
+**OS:** Raspberry Pi OS Bookworm 64-bit
 
-## Project Structure
+
 
 ```
 watcher.py            Main detection loop (always-on)

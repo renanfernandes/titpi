@@ -76,6 +76,13 @@ def get_recent(limit=50):
     return [dict(r) for r in rows]
 
 
+def count_all():
+    """Return the total number of detections in the database."""
+    with _connect() as conn:
+        row = conn.execute("SELECT COUNT(*) FROM detections").fetchone()
+    return row[0] if row else 0
+
+
 def get_today(date_str):
     """date_str: YYYY-MM-DD"""
     with _connect() as conn:

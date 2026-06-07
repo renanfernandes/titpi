@@ -30,7 +30,7 @@ def dashboard():
 def api_stats():
     today = date.today().isoformat()
     today_rows = database.get_today(today)
-    recent = database.get_recent(1000)
+    total = database.count_all()
     species_counts = database.get_species_counts(30)
 
     # Stored bird of the day (set at 7pm by compute_botd.py)
@@ -65,7 +65,7 @@ def api_stats():
 
     return jsonify({
         "today": len(today_rows),
-        "total": len(recent),
+        "total": total,
         "bird_of_day": botd.get("common_name") if botd else None,
         "bird_of_day_photo": botd_photo,
         "bird_of_day_visits": botd.get("visit_count") if botd else None,
