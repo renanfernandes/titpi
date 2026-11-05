@@ -433,7 +433,7 @@ try:
             last_capture = time.time()
             continue
 
-        send_detection_email("visitor", conf_score, photo_path, video_path, species)
+        send_detection_email(confirmed, conf_score, photo_path, video_path, species)
         database.log_detection(
             timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
             species=species.get("name") if species else None,

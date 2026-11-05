@@ -6,6 +6,8 @@
 <title>TitPi Bird Feeder</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
 <style>
   body { background:#0f1117; color:#e0e0e0; }
   .card { background:#1a1d27; border:1px solid #2a2d3a; }
@@ -117,11 +119,131 @@
   #load-more-btn:hover { background:#3a3d4a; color:#e0e0e0; }
   #load-more-count { color:#555; font-size:.75rem; margin-top:.25rem; }
 </style>
+<style>
+  :root { --page:#111312; --surface:#191c1a; --ink:#eef1ec; --muted:#9ba39e; --line:#303731; --accent:#a5cfad; }
+  body { background:var(--page); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; letter-spacing:0; }
+  button, input, select { font:inherit; }
+  button:focus-visible, a:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+  [hidden] { display:none !important; }
+  svg { width:18px; height:18px; flex-shrink:0; }
+  .text-muted { color:var(--muted) !important; }
+  .navbar { max-width:1240px; margin:0 auto !important; padding:20px 38px !important; gap:24px; background:var(--page) !important; border-color:var(--line); }
+  .navbar-brand { font-size:25px; display:flex; align-items:center; gap:10px; }
+  .navbar-brand svg { color:var(--accent); width:25px; height:25px; }
+  .view-tabs { display:flex; gap:24px; align-self:stretch; }
+  .view-tab { background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:8px 0; }
+  .view-tab.active { border-color:var(--accent); color:var(--ink); }
+  #date-controls { margin-left:auto; }
+  #clock { display:none; }
+  #dashboard-shell { max-width:1240px; padding:30px 38px !important; }
+  .card { background:none; border:0; border-radius:0; }
+  .card-title { font-size:16px; color:var(--ink); letter-spacing:0; text-transform:none; }
+  .dashboard-heading { font-size:28px; font-weight:500; margin:0 0 8px; }
+  .summary-line { display:flex; gap:25px; align-items:center; margin:0 0 25px; color:var(--muted); font-size:14px; flex-wrap:wrap; }
+  .summary-line .card { padding:0 !important; display:flex; flex-direction:row; align-items:center; gap:8px; }
+  .summary-line .card-title { font-size:14px; color:var(--muted); margin:0; }
+  .summary-line .stat-big { font-size:16px; color:var(--ink); }
+  .visits-layout { display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:36px; }
+  .visits-layout:has(.featured-bird[hidden]) { grid-template-columns:minmax(0,1fr); }
+  #visits-list { padding:0 !important; min-width:0; }
+  .featured-bird { border-left:1px solid var(--line); padding-left:26px; }
+  #botd-card { padding:0 !important; }
+  #botd-card .card-title { color:var(--muted); font-size:12px; margin:0 0 18px; }
+  #botd-photo { max-height:none !important; aspect-ratio:4/3; width:100%; }
+  #stat-botd { font-size:21px !important; margin-top:14px; }
+  .insights-heading { display:flex; justify-content:space-between; gap:20px; align-items:center; margin-bottom:26px; flex-wrap:wrap; }
+  .insights-heading p { color:var(--muted); font-size:13px; margin:0; }
+  #insights-periods { margin:0; padding:4px; border:1px solid var(--line); border-radius:6px; background:var(--surface); }
+  .period-pill { background:none; border:0; border-radius:3px; font-size:13px; padding:7px 12px; }
+  .period-pill.active { background:#35443a; color:var(--ink); }
+  #insight-charts .period-pills { display:none; }
+  .insights-summary { display:flex; gap:60px; padding-bottom:25px; border-bottom:1px solid var(--line); margin-bottom:25px; }
+  .insights-summary .card { padding:0 !important; }
+  .insights-summary .card-title { color:var(--muted); font-size:12px; }
+  .insights-summary .stat-big { font-size:29px; }
+  #insight-charts { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:28px; margin:0 0 24px !important; }
+  #insight-charts > div { width:auto; padding:0; min-width:0; }
+  #insight-charts > div:nth-child(3) { grid-column:1 / -1; grid-row:1; border-bottom:1px solid var(--line); padding-bottom:23px; }
+  #insight-charts > div:nth-child(2) { grid-column:1; grid-row:2; }
+  #insight-charts > div:nth-child(1) { grid-column:2; grid-row:2; border-left:1px solid var(--line); padding-left:25px; }
+  #insight-charts .card { padding:0 !important; }
+  .chart-frame { position:relative; height:220px; margin-top:18px; }
+  .chart-frame canvas { width:100% !important; height:100% !important; }
+  #activity-map { border-top:1px solid var(--line); padding-top:18px; }
+  #activity-map > summary { display:flex; align-items:center; justify-content:space-between; cursor:pointer; list-style:none; }
+  #activity-map > summary::-webkit-details-marker { display:none; }
+  #activity-map > .card { padding:20px 0 !important; }
+  #insights-empty { color:var(--muted); padding:35px 0 45px; text-align:center; }
+  .heatmap-cell.empty { background:#252b27; }
+  .species-filter-bar { background:none; border:0; border-bottom:1px solid var(--line); border-radius:0; padding:0 0 18px; gap:10px; }
+  .species-filter-bar label, #species-select { display:none; }
+  #species-text-filter { flex:1; min-width:100px; width:auto; background:var(--surface); color:var(--ink); border-color:var(--line); padding:9px 12px; font-size:14px; }
+  #species-text-filter::placeholder { color:var(--muted); }
+  .btn-export, .quiet-button { background:none; border:1px solid var(--line); border-radius:6px; color:var(--muted); padding:8px 10px; font-size:13px; display:inline-flex; align-items:center; gap:7px; }
+  .icon-button { border:0; background:none; color:var(--muted); display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:6px; text-decoration:none; }
+  #starred-filter-btn.active, .btn-star.starred { color:#dfc37e; }
+  #cal-btn, #cal-popup, #edit-modal { background:var(--surface); color:var(--ink); border-color:var(--line); border-radius:6px; }
+  #cal-btn { font-size:13px; }
+  .nav-date-btn { color:var(--muted); display:inline-flex; }
+  .table { --bs-table-bg:transparent; --bs-table-color:var(--ink); --bs-table-border-color:var(--line); margin:0; table-layout:fixed; }
+  .photo-column { width:142px; }
+  .actions-column { width:130px; }
+  .selection-column { width:32px; }
+  .table th { color:var(--muted); font-weight:400; font-size:12px; border-color:var(--line); }
+  .table td { border-color:var(--line); padding:17px 8px; }
+  .det-thumb, .det-thumb-placeholder { width:120px; height:88px; border-radius:5px; }
+  .det-thumb-placeholder { font-size:12px; padding:6px; text-align:center; }
+  .badge-species { background:none; color:var(--ink); padding:0; font-size:16px; font-weight:500; white-space:normal; text-align:left; }
+  .visit-time { color:var(--muted); font:12px 'IBM Plex Mono',monospace; margin-top:7px; }
+  .visit-actions { display:flex; align-items:center; gap:6px; }
+  .visit-menu { position:relative; }
+  .visit-menu summary { list-style:none; }
+  .visit-menu summary::-webkit-details-marker { display:none; }
+  .visit-menu[open] .visit-menu-content { position:absolute; right:0; top:34px; background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:12px; width:230px; z-index:100; box-shadow:0 10px 25px #0006; }
+  .visit-menu-content { font-size:12px; color:var(--muted); }
+  .visit-menu-content p { margin:0 0 8px; }
+  .visit-menu-content button, .visit-menu-content a { color:var(--ink); display:flex; align-items:center; gap:8px; padding:8px 0; border:0; background:none; font-size:13px; text-decoration:none; }
+  .selection-column { display:none; }
+  .selection-mode .selection-column { display:table-cell; }
+  .table-responsive { overflow:visible; }
+  #dashboard-error { background:#37271d; color:#f0c7a0; border-radius:6px; padding:12px; margin-bottom:20px; }
+  #bulk-bar { background:var(--surface); border-color:var(--accent); }
+  @media (max-width:800px) {
+    .navbar { padding:16px 20px !important; gap:20px; }
+    .navbar-brand { font-size:23px; }
+    #date-controls { width:100%; margin:0; }
+    #dashboard-shell { padding:25px 20px !important; }
+    .dashboard-heading { font-size:25px; }
+    .visits-layout { display:flex; flex-direction:column; gap:28px; }
+    .featured-bird { border-left:0; border-top:1px solid var(--line); padding:22px 0 0; }
+    #botd-photo { max-width:360px; }
+    #insight-charts { display:flex; flex-direction:column; }
+    #insight-charts > div:nth-child(3) { order:-1; }
+    #insight-charts > div:nth-child(1) { order:2; padding:22px 0 0; border-left:0; border-top:1px solid var(--line); }
+    .chart-frame { height:190px; }
+    .insights-summary { gap:35px; }
+    .det-thumb, .det-thumb-placeholder { width:82px; height:76px; }
+    .photo-column { width:90px; }
+    .actions-column { width:44px; }
+    .selection-column { width:24px; }
+    .table td { padding:14px 4px; }
+    .badge-species { font-size:15px; }
+    .visit-time { font-size:10px; }
+    .visit-actions { flex-direction:column; gap:0; }
+    .visit-actions > .btn-star { display:none; }
+    #bulk-bar { padding:12px; flex-wrap:wrap; }
+    #bulk-bar button { padding:6px 9px; }
+  }
+</style>
 </head>
 <body>
 <nav class="navbar navbar-dark px-3 mb-4">
-  <span class="navbar-brand mb-0"><strong>🐦 TitPi</strong> Bird Feeder Dashboard</span>
-  <div class="d-flex align-items-center gap-2 flex-wrap">
+  <span class="navbar-brand mb-0"><i data-lucide="bird"></i><strong>TitPi</strong></span>
+  <div class="view-tabs" role="tablist" aria-label="Dashboard views">
+    <button id="visits-tab" class="view-tab active" role="tab" aria-selected="true" aria-controls="visits-view" onclick="showView('visits')">Visits</button>
+    <button id="insights-tab" class="view-tab" role="tab" aria-selected="false" aria-controls="insights-view" onclick="showView('insights')">Insights</button>
+  </div>
+  <div id="date-controls" class="d-flex align-items-center gap-2 flex-wrap">
     <button class="nav-date-btn" onclick="stepDate(-1)" title="Previous day">&#8592;</button>
     <button id="cal-btn" onclick="toggleCalendar(event)" title="Pick a date">📅 <span id="cal-btn-label">Pick a date</span></button>
     <button class="nav-date-btn" onclick="stepDate(1)" title="Next day">&#8594;</button>
@@ -133,10 +255,11 @@
   </div>
   <span class="text-muted small" id="clock"></span>
 </nav>
-<div class="container-fluid px-4">
+<div class="container-fluid px-4" id="dashboard-shell">
+  <div id="dashboard-error" role="alert" hidden></div>
 
   <!-- Stats row -->
-  <div class="row g-3 mb-4">
+  <div class="row g-3 mb-4" id="summary-row">
     <div class="col-6 col-md-3"><div class="card p-3">
       <div class="card-title" id="stat-today-label">Today's Visits</div>
       <div class="stat-big" id="stat-today">—</div>
@@ -161,7 +284,7 @@
   </div>
 
   <!-- Charts row -->
-  <div class="row g-3 mb-4">
+  <div class="row g-3 mb-4" id="insight-charts">
     <div class="col-md-5"><div class="card p-3">
       <div class="card-title mb-1">Species Distribution</div>
       <div class="period-pills" id="pills-species">
@@ -195,6 +318,8 @@
   </div>
 
   <!-- Heatmap -->
+  <details id="activity-map">
+  <summary>Activity map <span class="text-muted small">Past year</span><i data-lucide="chevron-down"></i></summary>
   <div class="card p-3 mb-4">
     <div class="card-title mb-3">Activity Heatmap — Past Year <span class="text-muted" style="font-size:.75rem;text-transform:none">(click a day to filter)</span></div>
     <div style="display:flex;align-items:flex-start">
@@ -223,8 +348,10 @@
     </div>
   </div>
 
+  </details>
+
   <!-- Recent detections -->
-  <div class="card p-3 mb-4">
+  <div class="card p-3 mb-4" id="visits-list">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem" class="flex-wrap gap-2">
       <div class="card-title mb-0" id="det-title">Recent Detections</div>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
@@ -307,8 +434,104 @@
 const COLORS = ['#7ec8e3','#7ec8aa','#f0c040','#e07070','#b07ee3','#e3a07e','#7eb8e3','#a0e370','#e370b0','#70e3d8'];
 const HEATMAP_COLORS = ['#1e2130','#1a3a1a','#2d6a2d','#4a9a4a','#7ec87e'];
 const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function refreshIcons() {
+  if (window.lucide) lucide.createIcons();
+}
+
+function showView(view) {
+  for (const name of ['visits', 'insights']) {
+    document.getElementById(`${name}-view`).hidden = name !== view;
+    const tab = document.getElementById(`${name}-tab`);
+    tab.classList.toggle('active', name === view);
+    tab.setAttribute('aria-selected', String(name === view));
+  }
+  if (view === 'insights') Object.values(charts).forEach(chart => chart.resize());
+}
+
+function setupDashboard() {
+  const shell = document.getElementById('dashboard-shell');
+  const summary = document.getElementById('summary-row');
+  const cards = [...summary.children].map(column => column.firstElementChild);
+  const visits = document.createElement('section');
+  visits.id = 'visits-view';
+  visits.setAttribute('role', 'tabpanel');
+  visits.setAttribute('aria-labelledby', 'visits-tab');
+  visits.innerHTML = '<h1 class="dashboard-heading">At the feeder</h1><div class="summary-line"></div><div class="visits-layout"><aside class="featured-bird"></aside></div>';
+  visits.querySelector('.summary-line').append(cards[0]);
+  const latest = document.createElement('span');
+  latest.id = 'latest-visit';
+  visits.querySelector('.summary-line').append(latest);
+  visits.querySelector('.visits-layout').prepend(document.getElementById('visits-list'));
+  visits.querySelector('aside').append(cards[2]);
+  const insights = document.createElement('section');
+  insights.id = 'insights-view';
+  insights.hidden = true;
+  insights.setAttribute('role', 'tabpanel');
+  insights.setAttribute('aria-labelledby', 'insights-tab');
+  insights.innerHTML = '<div class="insights-heading"><div><h1 class="dashboard-heading">Activity insights</h1><p id="insights-period-label">Past 30 days</p></div><div id="insights-periods" class="period-pills" role="group" aria-label="Reporting period"></div></div><div class="insights-summary"></div>';
+  insights.querySelector('.insights-summary').append(cards[1], cards[3]);
+  insights.append(document.getElementById('insight-charts'), document.getElementById('activity-map'));
+  const empty = document.createElement('div');
+  empty.id = 'insights-empty';
+  empty.hidden = true;
+  empty.textContent = 'No recorded visits in this period. Choose All time to explore the archive.';
+  insights.querySelector('#insight-charts').before(empty);
+  summary.remove();
+  shell.append(visits, insights);
+  const periodButtons = document.getElementById('insights-periods');
+  for (const [days, label] of [[7, '7 days'], [14, '14 days'], [30, '30 days'], [90, '90 days'], [0, 'All time']]) {
+    const button = document.createElement('button');
+    button.className = 'period-pill' + (days === 30 ? ' active' : '');
+    button.textContent = label;
+    button.setAttribute('aria-pressed', String(days === 30));
+    button.onclick = () => setPeriod(days, button);
+    periodButtons.append(button);
+  }
+  cards[1].querySelector('.card-title').textContent = 'Visits recorded';
+  cards[3].querySelector('.card-title').textContent = 'Recorded labels';
+  const note = document.createElement('div');
+  note.className = 'text-muted small';
+  note.textContent = 'Includes unknown and non-birds';
+  cards[3].append(note);
+  document.getElementById('pills-species').previousElementSibling.textContent = 'Most Frequent Visitors!';
+  document.getElementById('pills-hour').previousElementSibling.textContent = 'Feeder Rush Hour';
+  document.getElementById('pills-daily').previousElementSibling.textContent = "Who's Been Stopping By?";
+  const table = document.querySelector('#visits-list table');
+  table.querySelector('thead').innerHTML = '<tr><th class="selection-column"><input type="checkbox" class="det-check" id="select-all" aria-label="Select all visible visits" onchange="toggleSelectAll(this)"></th><th class="photo-column">Photo</th><th>Visit</th><th class="actions-column"><span class="visually-hidden">Actions</span></th></tr>';
+  const selectButton = document.createElement('button');
+  selectButton.className = 'quiet-button';
+  selectButton.id = 'selection-toggle';
+  selectButton.innerHTML = '<i data-lucide="list-checks"></i>Select';
+  selectButton.onclick = toggleSelectionMode;
+  document.querySelector('#visits-list .card-title').parentElement.lastElementChild.prepend(selectButton);
+  document.getElementById('species-text-filter').placeholder = 'Search species';
+  document.getElementById('species-text-filter').setAttribute('list', 'species-options');
+  const options = document.createElement('datalist');
+  options.id = 'species-options';
+  document.getElementById('species-text-filter').after(options);
+  document.getElementById('starred-filter-btn').innerHTML = '<i data-lucide="star"></i>Starred';
+  document.querySelector('button[onclick="exportCSV()"]').innerHTML = '<i data-lucide="download"></i><span class="visually-hidden">Export CSV</span>';
+  document.querySelector('button[onclick="clearSpeciesFilter()"]').innerHTML = '<i data-lucide="x"></i><span class="visually-hidden">Clear species filter</span>';
+  document.querySelector('button[onclick="stepDate(-1)"]').innerHTML = '<i data-lucide="chevron-left"></i>';
+  document.querySelector('button[onclick="stepDate(1)"]').innerHTML = '<i data-lucide="chevron-right"></i>';
+  const calendarButton = document.getElementById('cal-btn');
+  calendarButton.firstChild.replaceWith(document.createElement('i'));
+  calendarButton.firstChild.setAttribute('data-lucide', 'calendar-days');
+  document.querySelector('.btn-bulk-edit').innerHTML = '<i data-lucide="pencil"></i> Edit species';
+  document.querySelector('button[onclick="bulkDelete()"]').innerHTML = '<i data-lucide="trash-2"></i> Delete';
+  for (const canvas of document.querySelectorAll('#insight-charts canvas')) {
+    const frame = document.createElement('div');
+    frame.className = 'chart-frame';
+    canvas.before(frame);
+    frame.append(canvas);
+  }
+  refreshIcons();
+}
+
+setupDashboard();
 let charts = {};
 let allRecent = [];
+let currentRows = [];
 let filteredRecent = [];
 let visibleCount = 50;
 const PAGE_SIZE = 50;
@@ -316,35 +539,65 @@ const periods = { species: 30, hour: 30, daily: 30 };
 let heatmapCountMap = {};
 let selectedDate = null;   // 'YYYY-MM-DD' or null
 let activeSpeciesFilter = null;
+let activeHourFilter = null;
 let starredFilterActive = false;
 let calYear, calMonth;     // currently displayed month in the popup
+let loadVersion = 0;
+
+async function fetchJSON(url, options) {
+  const response = await fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json();
+}
+
+function reportDashboardError(error) {
+  const banner = document.getElementById('dashboard-error');
+  banner.textContent = 'Could not refresh the dashboard. Retrying shortly.';
+  banner.hidden = false;
+  console.error('Dashboard refresh failed:', error.name);
+}
+
+function toggleSelectionMode() {
+  const table = document.querySelector('#visits-list table');
+  const enabled = table.classList.toggle('selection-mode');
+  document.getElementById('selection-toggle').setAttribute('aria-pressed', String(enabled));
+  if (!enabled) clearSelection();
+}
 
 // ── Stats + Charts ───────────────────────────────────────────────────────────
 async function load() {
+  const version = ++loadVersion;
   const [stats, species, hourly, daily] = await Promise.all([
-    fetch('/api/stats').then(r=>r.json()),
-    fetch(`/api/species?days=${periods.species}`).then(r=>r.json()),
-    fetch(`/api/hourly?days=${periods.hour}`).then(r=>r.json()),
-    fetch(`/api/daily?days=${periods.daily}`).then(r=>r.json()),
+    fetchJSON('/api/stats'),
+    fetchJSON(`/api/species?days=${periods.species}`),
+    fetchJSON(`/api/hourly?days=${periods.hour}`),
+    fetchJSON(`/api/daily?days=${periods.daily}`),
   ]);
+  if (version !== loadVersion) return;
+  document.getElementById('dashboard-error').hidden = true;
 
   // Only update today's count when no date is pinned
   if (!selectedDate) {
     document.getElementById('stat-today').textContent = stats.today;
     document.getElementById('stat-today-label').textContent = "Today's Visits";
   }
-  document.getElementById('stat-total').textContent = stats.total;
+  document.getElementById('stat-total').textContent = daily.reduce((total, day) => total + day.count, 0).toLocaleString();
   if (!selectedDate) updateBotd(stats);
-  document.getElementById('stat-species').textContent = stats.species_count;
+  document.getElementById('stat-species').textContent = species.length;
+  const hasActivity = species.length > 0 || daily.some(day => day.count > 0) || hourly.some(hour => hour.count > 0);
+  document.getElementById('insights-empty').hidden = hasActivity;
+  document.getElementById('insight-charts').hidden = !hasActivity;
 
   Object.values(charts).forEach(c => c.destroy());
   charts = {};
 
-  const speciesColors = species.map((_, i) => COLORS[i % COLORS.length]);
+  const rankedSpecies = species.slice(0, 8);
+  const speciesColors = rankedSpecies.map((_, index) => index === 0 ? '#bdd8a7' : '#739a7d');
   charts.species = new Chart(document.getElementById('chartSpecies'), {
-    type: 'doughnut',
-    data: { labels: species.map(s=>s.name), datasets:[{ data: species.map(s=>s.count), backgroundColor: speciesColors.slice() }] },
+    type: 'bar',
+    data: { labels: rankedSpecies.map(s=>s.name), datasets:[{ data: rankedSpecies.map(s=>s.count), backgroundColor: speciesColors }] },
     options: {
+      responsive:true, maintainAspectRatio:false, indexAxis:'y', animation:false,
       onClick(e, els) {
         if (!els.length) { if (activeSpeciesFilter) clearSpeciesChartFilter(); return; }
         const idx = els[0].index;
@@ -353,16 +606,10 @@ async function load() {
         filterBySpecies(name);
       },
       plugins:{
-        legend:{
-          onClick(e, legendItem) {
-            const name = legendItem.text;
-            if (activeSpeciesFilter === name) { clearSpeciesChartFilter(); return; }
-            filterBySpecies(name);
-          },
-          labels:{ color:'#ccc', font:{size:11} }
-        },
+        legend:{display:false},
         tooltip:{callbacks:{title:l=>`${l[0].label} — click to filter`}}
-      }
+      },
+      scales:{x:{beginAtZero:true,ticks:{color:'#9ba39e'},grid:{color:'#28312a'}},y:{ticks:{color:'#eef1ec',font:{size:11}},grid:{display:false}}}
     }
   });
 
@@ -372,6 +619,7 @@ async function load() {
     type: 'bar',
     data: { labels: hours.map(h=>String(h).padStart(2,'0')+':00'), datasets:[{ data: hours.map(h=>hMap[h]||0), backgroundColor:'#7ec8e3', borderRadius:3 }] },
     options: {
+      responsive:true, maintainAspectRatio:false, animation:false,
       onClick(e, els) {
         if (!els.length) return;
         filterByHour(els[0].index);
@@ -384,11 +632,13 @@ async function load() {
   charts.daily = new Chart(document.getElementById('chartDaily'), {
     type: 'line',
     data: { labels: daily.map(d=>d.day.slice(5)), datasets:[{ data: daily.map(d=>d.count), borderColor:'#7ec8aa', backgroundColor:'rgba(126,200,170,0.15)', fill:true, tension:0.3, pointRadius:3 }] },
-    options: { plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:'#888',font:{size:10}}, grid:{color:'#2a2d3a'} }, y:{ ticks:{color:'#888'}, grid:{color:'#2a2d3a'} } } }
+    options: { responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:'#9ba39e',font:{size:10},maxTicksLimit:6,maxRotation:0}, grid:{display:false} }, y:{ beginAtZero:true,ticks:{color:'#9ba39e'}, grid:{color:'#28312a'} } } }
   });
+  if (activeSpeciesFilter) setSpeciesChartHighlight(activeSpeciesFilter);
 }
 
 function updateBotd(stats, dateLabel) {
+  document.querySelector('.featured-bird').hidden = !stats.bird_of_day;
   document.getElementById('stat-botd').textContent = stats.bird_of_day || '—';
   const photoWrap = document.getElementById('botd-photo-wrap');
   const photo = document.getElementById('botd-photo');
@@ -410,6 +660,15 @@ function updateBotd(stats, dateLabel) {
 }
 
 // ── Table rendering ──────────────────────────────────────────────────────────
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[character]));
+}
+
+function editDetection(id) {
+  const detection = currentRows.find(row => row.id === id) || allRecent.find(row => row.id === id);
+  if (detection) openEditModal(id, detection.common_name || '', detection.species || '');
+}
+
 function renderRow(d) {
   const conf = d.gpt_confidence;
   const confClass = conf >= 0.7 ? 'conf-high' : conf >= 0.4 ? 'conf-med' : 'conf-low';
@@ -419,58 +678,64 @@ function renderRow(d) {
   const photoFile = d.photo_path ? encodeURIComponent(d.photo_path.split('/').pop()) : null;
   const caption = `${sp} — ${ts}`;
   const thumb = photoFile
-    ? `<img src="/photo/${photoFile}" class="det-thumb" onclick="openLightbox('/photo/${photoFile}','${caption.replace(/'/g,"&#39;")}')" onerror="this.outerHTML='<div class=det-thumb-placeholder>🐦</div>'">`
-    : `<div class="det-thumb-placeholder">🐦</div>`;
+    ? `<img src="/photo/${photoFile}" class="det-thumb" alt="${escapeHTML(sp)}" loading="lazy" tabindex="0" role="button" onclick="openLightbox('/photo/${photoFile}',${escapeHTML(JSON.stringify(caption))})" onkeydown="if(event.key==='Enter')this.click()" onerror="this.outerHTML='<div class=det-thumb-placeholder>Unavailable</div>'">`
+    : '<div class="det-thumb-placeholder">No photo</div>';
+  const videoUrl = d.video_path ? `/video/${encodeURIComponent(d.video_path.split('/').pop())}` : null;
   const video = d.video_path
-    ? `<a href="/video/${encodeURIComponent(d.video_path.split('/').pop())}" target="_blank" class="text-info small">▶ play</a> <a href="/video/${encodeURIComponent(d.video_path.split('/').pop())}" download class="text-info small" title="Download video">⬇</a>` : '—';
+    ? `<a href="${videoUrl}" target="_blank" rel="noopener" class="icon-button" title="Play visit video"><i data-lucide="play"></i><span class="visually-hidden">Play video</span></a>` : '';
   const dur = d.visit_duration ? `${Math.round(d.visit_duration)}s` : '—';
-  const spDisplay = d.common_name || d.species || '<span class="text-muted">Unknown</span>';
-  const starIcon = d.starred ? '⭐' : '☆';
   const starTitle = d.starred ? 'Unstar' : 'Star this detection';
-  const actions = `<button class="btn-act btn-star${d.starred ? ' starred' : ''}" title="${starTitle}" onclick="toggleStar(${d.id},this)"><span>${starIcon}</span></button><button class="btn-act" title="Edit species" onclick="openEditModal(${d.id},'${(d.common_name||'').replace(/'/g,"&#39;")}','${(d.species||'').replace(/'/g,"&#39;")}')" >✏️</button><button class="btn-act" title="Delete" onclick="deleteDetection(${d.id},this)">🗑️</button>`;
-  return `<tr id="det-row-${d.id}"><td><input type="checkbox" class="det-check row-check" data-id="${d.id}" onchange="updateBulkBar()"></td><td>${thumb}</td><td class="small">${ts}</td><td><span class="badge badge-species">${spDisplay}</span></td><td>${confStr}</td><td class="small">${d.spike_score?d.spike_score.toFixed(2):'—'}</td><td class="small">${dur}</td><td>${video}</td><td style="white-space:nowrap">${actions}</td></tr>`;
+  const details = `<details class="visit-menu"><summary class="icon-button" title="Visit details and actions"><i data-lucide="ellipsis"></i><span class="visually-hidden">Visit details and actions</span></summary><div class="visit-menu-content"><p>${escapeHTML(d.species || 'Unknown')}</p><p>Confidence: ${confStr}</p><p>Detection score: ${d.spike_score != null ? Number(d.spike_score).toFixed(2) : '—'}</p><p>Duration: ${dur}</p><button onclick="toggleStar(${d.id},this)" title="${starTitle}"><i data-lucide="star"></i>${d.starred ? 'Unstar' : 'Star'} visit</button>${videoUrl ? `<a href="${videoUrl}" download><i data-lucide="download"></i>Download video</a>` : ''}${photoFile ? `<a href="/photo/${photoFile}" download><i data-lucide="image-down"></i>Download photo</a>` : ''}<button onclick="editDetection(${d.id})"><i data-lucide="pencil"></i>Edit species</button><button onclick="deleteDetection(${d.id},this)"><i data-lucide="trash-2"></i>Delete visit</button></div></details>`;
+  const actions = `<div class="visit-actions">${video}<button class="icon-button btn-star${d.starred ? ' starred' : ''}" title="${starTitle}" aria-pressed="${Boolean(d.starred)}" onclick="toggleStar(${d.id},this)"><i data-lucide="star"></i></button>${details}</div>`;
+  return `<tr id="det-row-${d.id}"><td class="selection-column"><input type="checkbox" class="det-check row-check" data-id="${d.id}" aria-label="Select ${escapeHTML(sp)} visit" onchange="updateBulkBar()"></td><td>${thumb}</td><td><span class="badge badge-species">${escapeHTML(sp)}</span><div class="visit-time">${escapeHTML(ts)}</div></td><td>${actions}</td></tr>`;
 }
 
 function renderTable(rows) {
   const tbody = document.getElementById('det-tbody');
-  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-muted small text-center py-3">No detections</td></tr>'; return; }
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" class="text-muted small text-center py-3">No matching visits</td></tr>'; clearSelection(); return; }
   tbody.innerHTML = rows.map(renderRow).join('');
+  clearSelection();
+  refreshIcons();
 }
 
 async function loadRecent() {
-  allRecent = await fetch('/api/recent').then(r=>r.json());
+  allRecent = await fetchJSON('/api/recent');
+  document.getElementById('latest-visit').textContent = allRecent[0]?.timestamp ? `Latest visit: ${allRecent[0].timestamp.slice(0,16).replace('T', ' ')}` : 'No recorded visits yet';
   rebuildSpeciesSelect();
-  filteredRecent = allRecent.slice();
-  visibleCount = PAGE_SIZE;
-  renderTable(filteredRecent.slice(0, visibleCount));
-  updateLoadMore();
+  if (selectedDate) currentRows = await fetchJSON(`/api/by_date/${selectedDate}`);
+  else if (activeSpeciesFilter) currentRows = await fetchJSON(`/api/by_species/${encodeURIComponent(activeSpeciesFilter)}`);
+  else if (activeHourFilter !== null) currentRows = await fetchJSON(`/api/by_hour/${activeHourFilter}`);
+  else currentRows = allRecent.slice();
+  if (activeSpeciesFilter) currentRows = currentRows.filter(row => (row.common_name || row.species) === activeSpeciesFilter);
+  applySpeciesFilter(false);
 }
 
 // ── Filters ──────────────────────────────────────────────────────────────────
 async function filterByHour(hour) {
-  const rows = await fetch(`/api/by_hour/${hour}`).then(r=>r.json());
+  activeHourFilter = hour;
+  activeSpeciesFilter = null;
+  const rows = await fetchJSON(`/api/by_hour/${hour}`);
   const label = `${String(hour).padStart(2,'0')}:00`;
   document.getElementById('det-title').textContent = `Detections — ${label}`;
   document.getElementById('filter-label').textContent = `Hour: ${label}`;
   document.getElementById('filter-badge').style.display = '';
-  filteredRecent = rows;
-  visibleCount = PAGE_SIZE;
-  renderTable(filteredRecent.slice(0, visibleCount));
-  updateLoadMore();
+  currentRows = selectedDate ? rows.filter(row => row.timestamp.startsWith(selectedDate)) : rows;
+  applySpeciesFilter();
+  showView('visits');
   document.getElementById('det-tbody').closest('.card').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 async function filterBySpecies(name) {
   activeSpeciesFilter = name;
+  activeHourFilter = null;
   setSpeciesChartHighlight(name);
-  const rows = await fetch(`/api/by_species/${encodeURIComponent(name)}`).then(r=>r.json());
+  const rows = await fetchJSON(`/api/by_species/${encodeURIComponent(name)}`);
   document.getElementById('det-title').textContent = `Detections — ${name}`;
   document.getElementById('filter-label').textContent = `Species: ${name}`;
   document.getElementById('filter-badge').style.display = '';
-  filteredRecent = rows;
-  visibleCount = PAGE_SIZE;
-  renderTable(filteredRecent.slice(0, visibleCount));
-  updateLoadMore();
+  currentRows = selectedDate ? rows.filter(row => row.timestamp.startsWith(selectedDate)) : rows;
+  applySpeciesFilter();
+  showView('visits');
   document.getElementById('det-tbody').closest('.card').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
@@ -496,6 +761,8 @@ function clearSpeciesChartFilter() {
 }
 
 async function filterByDate(dateStr) {
+  activeSpeciesFilter = null;
+  activeHourFilter = null;
   const [rows, botd] = await Promise.all([
     fetch(`/api/by_date/${dateStr}`).then(r=>r.json()),
     fetch(`/api/botd/${dateStr}`).then(r=>r.json()),
@@ -506,10 +773,9 @@ async function filterByDate(dateStr) {
   document.getElementById('det-title').textContent = `Detections — ${dateStr}`;
   document.getElementById('filter-label').textContent = `Date: ${dateStr}`;
   document.getElementById('filter-badge').style.display = '';
-  filteredRecent = rows;
-  visibleCount = PAGE_SIZE;
-  renderTable(filteredRecent.slice(0, visibleCount));
-  updateLoadMore();
+  currentRows = rows;
+  applySpeciesFilter();
+  showView('visits');
   // Update Today's Visits card for selected day
   document.getElementById('stat-today-label').textContent = `Visits — ${shortLabel}`;
   document.getElementById('stat-today').textContent = rows.length;
@@ -524,6 +790,7 @@ async function filterByDate(dateStr) {
   } else {
     // No bird data for this day — reset card title only
     document.getElementById('botd-card').querySelector('.card-title').textContent = `Bird of the Day — ${short}`;
+    document.querySelector('.featured-bird').hidden = true;
     document.getElementById('stat-botd').textContent = rows.length ? '(unidentified)' : '—';
     document.getElementById('botd-photo-wrap').style.display = 'none';
     document.getElementById('stat-botd-visits').textContent = '';
@@ -533,15 +800,18 @@ async function filterByDate(dateStr) {
 }
 
 function clearFilter() {
+  activeHourFilter = null;
+  selectedDate = null;
+  document.getElementById('active-date-badge').classList.remove('visible');
+  document.getElementById('cal-btn-label').textContent = 'Pick a date';
+  document.getElementById('cal-btn').classList.remove('active');
   if (activeSpeciesFilter) { activeSpeciesFilter = null; setSpeciesChartHighlight(null); }
   document.getElementById('det-title').textContent = 'Recent Detections';
   document.getElementById('filter-badge').style.display = 'none';
   document.getElementById('botd-card').querySelector('.card-title').textContent = 'Bird of the Day';
   document.getElementById('stat-today-label').textContent = "Today's Visits";
-  filteredRecent = allRecent.slice();
-  visibleCount = PAGE_SIZE;
-  renderTable(filteredRecent.slice(0, visibleCount));
-  updateLoadMore();
+  currentRows = allRecent.slice();
+  applySpeciesFilter();
   // Restore today's stats
   fetch('/api/stats').then(r=>r.json()).then(stats => {
     updateBotd(stats);
@@ -649,67 +919,37 @@ document.addEventListener('click', e => {
 });
 
 // ── Period selector ───────────────────────────────────────────────────────────
-async function setPeriod(chart, days, btn) {
-  periods[chart] = days;
-  // Update active pill
-  document.querySelectorAll(`#pills-${chart} .period-pill`).forEach(p => p.classList.remove('active'));
-  btn.classList.add('active');
-  // Refetch only the affected chart
-  if (chart === 'species') {
-    const species = await fetch(`/api/species?days=${days}`).then(r=>r.json());
-    charts.species.destroy();
-    charts.species = new Chart(document.getElementById('chartSpecies'), {
-      type: 'doughnut',
-      data: { labels: species.map(s=>s.name), datasets:[{ data: species.map(s=>s.count), backgroundColor: COLORS }] },
-      options: {
-        onClick(e, els) { if (!els.length) return; filterBySpecies(species[els[0].index].name); },
-        plugins:{ legend:{ labels:{ color:'#ccc', font:{size:11} } }, tooltip:{callbacks:{title:l=>`${l[0].label} — click to filter`}} }
-      }
-    });
-  } else if (chart === 'hour') {
-    const hourly = await fetch(`/api/hourly?days=${days}`).then(r=>r.json());
-    const hours = Array.from({length:24},(_,i)=>i);
-    const hMap = Object.fromEntries(hourly.map(h=>[h.hour, h.count]));
-    charts.hour.destroy();
-    charts.hour = new Chart(document.getElementById('chartHour'), {
-      type: 'bar',
-      data: { labels: hours.map(h=>String(h).padStart(2,'0')+':00'), datasets:[{ data: hours.map(h=>hMap[h]||0), backgroundColor:'#7ec8e3', borderRadius:3 }] },
-      options: {
-        onClick(e, els) { if (!els.length) return; filterByHour(els[0].index); },
-        plugins:{legend:{display:false},tooltip:{callbacks:{title:l=>`${l[0].label} — click to filter`}}},
-        scales:{ x:{ ticks:{color:'#888',maxRotation:45,font:{size:10}}, grid:{color:'#2a2d3a'} }, y:{ ticks:{color:'#888'}, grid:{color:'#2a2d3a'} } }
-      }
-    });
-  } else if (chart === 'daily') {
-    const daily = await fetch(`/api/daily?days=${days}`).then(r=>r.json());
-    charts.daily.destroy();
-    charts.daily = new Chart(document.getElementById('chartDaily'), {
-      type: 'line',
-      data: { labels: daily.map(d=>d.day.slice(5)), datasets:[{ data: daily.map(d=>d.count), borderColor:'#7ec8aa', backgroundColor:'rgba(126,200,170,0.15)', fill:true, tension:0.3, pointRadius:3 }] },
-      options: { plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:'#888',font:{size:10}}, grid:{color:'#2a2d3a'} }, y:{ ticks:{color:'#888'}, grid:{color:'#2a2d3a'} } } }
-    });
-  }
+async function setPeriod(days, button) {
+  periods.species = periods.hour = periods.daily = days;
+  document.querySelectorAll('#insights-periods button').forEach(item => {
+    item.classList.toggle('active', item === button);
+    item.setAttribute('aria-pressed', String(item === button));
+  });
+  document.getElementById('insights-period-label').textContent = days ? `Past ${days} days` : 'All recorded activity';
+  try { await load(); } catch (error) { reportDashboardError(error); }
 }
 
 // ── Species quick-filter (table) ──────────────────────────────────────────────
 function rebuildSpeciesSelect() {
   const sel = document.getElementById('species-select');
   const current = sel.value;
-  const names = [...new Set(allRecent.map(d => d.common_name || d.species || 'Unknown'))].sort();
+  const names = [...new Set([...allRecent, ...currentRows].map(d => d.common_name || d.species || 'Unknown'))].sort();
   sel.innerHTML = '<option value="">All species</option>' +
-    names.map(n => `<option${n===current?' selected':''}>${n}</option>`).join('');
+    names.map(n => `<option${n===current?' selected':''}>${escapeHTML(n)}</option>`).join('');
+  document.getElementById('species-options').replaceChildren(...names.map(name => new Option(name, name)));
 }
 
-function applySpeciesFilter() {
+function applySpeciesFilter(resetPage = true) {
   const text = document.getElementById('species-text-filter').value.toLowerCase();
   const sel  = document.getElementById('species-select').value;
-  filteredRecent = allRecent.filter(d => {
+  filteredRecent = currentRows.filter(d => {
     const name = (d.common_name || d.species || '').toLowerCase();
     return (!text || name.includes(text)) &&
            (!sel || (d.common_name || d.species) === sel) &&
+           (activeHourFilter === null || Number((d.timestamp || '').slice(11,13)) === activeHourFilter) &&
            (!starredFilterActive || d.starred);
   });
-  visibleCount = PAGE_SIZE;
+  if (resetPage) visibleCount = PAGE_SIZE;
   renderTable(filteredRecent.slice(0, visibleCount));
   updateLoadMore();
 }
@@ -717,21 +957,38 @@ function applySpeciesFilter() {
 function toggleStarredFilter() {
   starredFilterActive = !starredFilterActive;
   const btn = document.getElementById('starred-filter-btn');
-  btn.textContent = starredFilterActive ? '⭐ Starred' : '☆ Starred';
   btn.classList.toggle('active', starredFilterActive);
+  btn.setAttribute('aria-pressed', String(starredFilterActive));
   applySpeciesFilter();
 }
 
 async function toggleStar(id, btn) {
-  const res = await fetch(`/api/detection/${id}/star`, {method: 'POST'}).then(r => r.json());
+  let res;
+  try { res = await fetchJSON(`/api/detection/${id}/star`, {method: 'POST'}); }
+  catch (error) { alert('Could not update the star. Please try again.'); return; }
   const starred = res.starred;
   btn.classList.toggle('starred', starred);
   btn.title = starred ? 'Unstar' : 'Star this detection';
-  btn.querySelector('span').textContent = starred ? '⭐' : '☆';
-  const det = allRecent.find(d => d.id === id);
-  if (det) det.starred = starred ? 1 : 0;
+  for (const rows of [allRecent, currentRows, filteredRecent]) {
+    const det = rows.find(d => d.id === id);
+    if (det) det.starred = starred ? 1 : 0;
+  }
   // If starred filter is active and we just unstarred, re-apply filter
   if (starredFilterActive && !starred) applySpeciesFilter();
+  else replaceRenderedRow(currentRows.find(row => row.id === id));
+}
+
+function replaceRenderedRow(detection) {
+  if (!detection) return;
+  const row = document.getElementById(`det-row-${detection.id}`);
+  if (!row) return;
+  const selected = row.querySelector('.row-check').checked;
+  const fragment = document.createElement('tbody');
+  fragment.innerHTML = renderRow(detection);
+  fragment.querySelector('.row-check').checked = selected;
+  row.replaceWith(fragment.firstElementChild);
+  refreshIcons();
+  updateBulkBar();
 }
 
 function clearSpeciesFilter() {
@@ -740,13 +997,14 @@ function clearSpeciesFilter() {
   if (starredFilterActive) {
     starredFilterActive = false;
     const btn = document.getElementById('starred-filter-btn');
-    btn.textContent = '☆ Starred';
     btn.classList.remove('active');
+    btn.setAttribute('aria-pressed', 'false');
   }
-  filteredRecent = allRecent.slice();
-  visibleCount = PAGE_SIZE;
-  renderTable(filteredRecent.slice(0, visibleCount));
-  updateLoadMore();
+  if (activeSpeciesFilter) {
+    activeSpeciesFilter = null;
+    setSpeciesChartHighlight(null);
+  }
+  loadRecent().catch(reportDashboardError);
 }
 
 // ── Load more ──────────────────────────────────────────────────────────────────
@@ -849,13 +1107,15 @@ async function buildHeatmap() {
 function tick() { document.getElementById('clock').textContent = new Date().toLocaleTimeString(); }
 tick(); setInterval(tick, 1000);
 
-Promise.all([load(), loadRecent(), buildHeatmap()]);
+Promise.all([load(), loadRecent(), buildHeatmap()]).catch(reportDashboardError);
 setInterval(() => {
   // Don't refresh while the user is editing or a lightbox is open
   const editing = document.getElementById('edit-modal-bg').classList.contains('open');
   const viewing = document.getElementById('lightbox').classList.contains('open');
-  if (editing || viewing) return;
-  load(); loadRecent();
+  const selecting = getSelectedIds().length > 0;
+  const menuOpen = document.querySelector('.visit-menu[open]') || document.getElementById('cal-popup').classList.contains('open');
+  if (editing || viewing || selecting || menuOpen) return;
+  Promise.all([load(), loadRecent(), buildHeatmap()]).catch(reportDashboardError);
 }, 30000);
 
 // ── Delete & Edit ────────────────────────────────────────────────────────────
@@ -866,6 +1126,7 @@ async function deleteDetection(id, btn) {
   if (r.ok) {
     document.getElementById(`det-row-${id}`)?.remove();
     allRecent = allRecent.filter(d => d.id !== id);
+    currentRows = currentRows.filter(d => d.id !== id);
     filteredRecent = filteredRecent.filter(d => d.id !== id);
     updateLoadMore();
     load(); // refresh stat counters
@@ -929,8 +1190,10 @@ async function saveEdit() {
         if (idx >= 0) { allRecent[idx].common_name = common_name; if (species) allRecent[idx].species = species; }
         const fi = filteredRecent.findIndex(d => d.id === id);
         if (fi >= 0) { filteredRecent[fi].common_name = common_name; if (species) filteredRecent[fi].species = species; }
+        const current = currentRows.find(row => row.id === id);
+        if (current) { current.common_name = common_name; if (species) current.species = species; }
         const row = document.getElementById(`det-row-${id}`);
-        if (row) { const badge = row.querySelector('.badge-species'); if (badge) badge.textContent = common_name; }
+        if (row) replaceRenderedRow(currentRows.find(detection => detection.id === id));
       }
       rebuildSpeciesSelect();
       clearSelection();
@@ -941,7 +1204,8 @@ async function saveEdit() {
   } else {
     // Single update
     if (_editId === null) return;
-    const r = await fetch(`/api/detection/${_editId}`, {
+    const editId = _editId;
+    const r = await fetch(`/api/detection/${editId}`, {
       method: 'PATCH',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({common_name, species}),
@@ -949,20 +1213,14 @@ async function saveEdit() {
     if (r.ok) {
       closeEditModal();
       // Update local cache
-      const idx = allRecent.findIndex(d => d.id === _editId);
+      const idx = allRecent.findIndex(d => d.id === editId);
       if (idx >= 0) { allRecent[idx].common_name = common_name; if (species) allRecent[idx].species = species; }
-      const fi = filteredRecent.findIndex(d => d.id === _editId);
+      const fi = filteredRecent.findIndex(d => d.id === editId);
       if (fi >= 0) { filteredRecent[fi].common_name = common_name; if (species) filteredRecent[fi].species = species; }
       // Re-render the row so badge + edit-button args are both current
-      const row = document.getElementById(`det-row-${_editId}`);
-      if (row) {
-        const det = allRecent.find(d => d.id === _editId);
-        if (det) {
-          const tmp = document.createElement('tbody');
-          tmp.innerHTML = renderRow(det);
-          row.replaceWith(tmp.firstElementChild);
-        }
-      }
+      const current = currentRows.find(row => row.id === editId);
+      if (current) { current.common_name = common_name; if (species) current.species = species; }
+      replaceRenderedRow(current);
       rebuildSpeciesSelect();
       load();
     } else {
@@ -1013,6 +1271,7 @@ async function bulkDelete() {
       document.getElementById(`det-row-${id}`)?.remove();
     }
     allRecent = allRecent.filter(d => !ids.includes(d.id));
+    currentRows = currentRows.filter(d => !ids.includes(d.id));
     filteredRecent = filteredRecent.filter(d => !ids.includes(d.id));
     clearSelection();
     updateLoadMore();

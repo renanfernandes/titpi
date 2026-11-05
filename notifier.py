@@ -4,6 +4,7 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders as email_encoders
+from html import escape
 import os
 import json
 import re
@@ -44,7 +45,7 @@ def _render_template(template_str, ctx):
     )
     # Handle variables
     def _replace_var(m):
-        return str(ctx.get(m.group(1).strip(), ""))
+        return escape(str(ctx.get(m.group(1).strip(), "")), quote=True)
     return re.sub(r'\{\{\s*(\w+)\s*\}\}', _replace_var, template_str)
 
 
@@ -53,17 +54,12 @@ def send_detection_email(label, confidence, image_path=None, video_path=None, sp
         print("[NOTIFY] Email not configured. Set TITPI_EMAIL_* env vars.")
         return False
 
-    subject = f"TitPi Alert: {label.upper()} detected!"
-    if species:
-        actual = species.get('category', label)
-        if actual != label:
-            subject = f"TitPi Alert: {species['common_name']} (was {label.upper()}) detected!"
-        else:
-            subject = f"TitPi Alert: {species['common_name']} ({label.upper()}) detected!"
+    visitor = species.get('common_name') if species else None
+    subject = f"TitPi: {visitor} stopped by!" if visitor else "TitPi: Someone stopped by!"
 
     # Build template context
     source = species.get('source', 'unknown') if species else ''
-    source_label = 'Local model' if source == 'local' else 'GPT' if source == 'gpt' else source
+    source_label = 'Local model' if source == 'local' else 'GitHub model' if source == 'gpt' else source
     video_link = None
     if video_path and not ATTACH_VIDEO:
         video_link = f"http://{WEB_HOST}:{WEB_PORT}/video/{os.path.basename(video_path)}"

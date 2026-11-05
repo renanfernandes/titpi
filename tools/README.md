@@ -12,6 +12,18 @@ ssh titpi@<pi-ip> "python3 /home/titpi/titpi/tools/<script>.py"
 
 ---
 
+## dashboard_preview.py - Read-only dashboard preview
+
+Preview the local dashboard on macOS using real data from an existing TitPi:
+
+```bash
+python3 tools/dashboard_preview.py --upstream http://10.0.0.80:8080 --port 8082
+```
+
+Open http://127.0.0.1:8082. The server is localhost-only and proxies GET requests for data, photos, and video. It does not read configuration credentials and rejects real edits, stars, and deletion requests. Use another port if occupied; stop with Ctrl+C.
+
+---
+
 ## preview.py — Live camera preview
 
 Streams a live MJPEG feed over HTTP so you can aim and focus the camera before starting the main service.

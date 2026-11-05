@@ -46,7 +46,7 @@ The IMX500 runs neural network inference directly on the sensor chip — the Pi 
 - **Species aliases** — normalizes variant names to canonical species via `species_aliases.json`
 - **False positive cleanup** — automatically deletes photos/videos when neither classifier identifies anything
 - **High-res capture** — 2028×1520 stills + H264 video (10–120s) on each confirmed detection
-- **Web dashboard** — real-time stats, species doughnut chart (click to filter), hourly bar chart, 365-day activity heatmap, photo lightbox
+- **Web dashboard** — photo-first Visits view, shared-period Insights with ranked labels and activity charts, GitHub-style yearly heatmap, photo lightbox
 - **Bulk management** — multi-select detections for bulk edit or delete from the dashboard
 - **Bird of the Day** — daily ranking that prioritizes first-ever sightings, with photos saved to `detections/bird_of_the_day/`
 - **Email alerts** — per-detection notifications with photo attachment; video attached or linked (configurable)
