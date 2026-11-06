@@ -1,5 +1,7 @@
 config.json
 config_lcd.json
+config_lcd.json.*
+.titpi-settings-*
 notifier_lcd.py
 detections/
 __pycache__/

@@ -6,7 +6,12 @@ Run: python3 web.py  (or via titpi-web.service on port 8080)
 import os
 import json
 import re
+import hashlib
+import tempfile
+import fcntl
+import subprocess
 from datetime import date
+from urllib.parse import urlsplit
 from flask import Flask, jsonify, send_from_directory, abort, render_template, request
 import database
 
@@ -19,6 +24,122 @@ PORT = _cfg.get("database", {}).get("web_port", 8080)
 
 database.init_db()
 app = Flask(__name__)
+LCD_CONFIG_PATH = os.path.join(os.path.dirname(CONFIG_PATH), "config_lcd.json")
+
+
+def _settings_access(write=False):
+    if write and (request.headers.get("Origin") != request.host_url.rstrip("/")
+                  or request.headers.get("Sec-Fetch-Site") == "cross-site"):
+        return jsonify(error="Same-origin requests are required."), 403
+    if write and not request.is_json:
+        return jsonify(error="A JSON request is required."), 415
+
+
+def _lcd_settings(content):
+    lcd = json.loads(content).get("lcd", {})
+    return {
+        "url": lcd.get("url", ""),
+        "spotify_account": lcd.get("spotify_account", "default"),
+        "display_seconds": lcd.get("display_seconds", 30),
+    }
+
+
+def _atomic_settings_write(path, content):
+    descriptor, temporary = tempfile.mkstemp(prefix=".titpi-settings-", dir=os.path.dirname(path))
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            output.write(content)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+@app.after_request
+def settings_headers(response):
+    if request.path == "/settings" or request.path.startswith("/api/settings"):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.route("/settings")
+def settings():
+    return render_template("settings.html")
+
+
+@app.route("/api/settings/lcd", methods=["GET", "PATCH"])
+def api_settings_lcd():
+    denied = _settings_access(write=request.method == "PATCH")
+    if denied is not None:
+        return denied
+    try:
+        with open(LCD_CONFIG_PATH + ".lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            with open(LCD_CONFIG_PATH, "rb") as config_file:
+                content = config_file.read()
+            version = hashlib.sha256(content).hexdigest()
+            if request.method == "GET":
+                return jsonify(lcd=_lcd_settings(content), version=version,
+                               can_restart=os.environ.get("TITPI_ALLOW_RESTART") == "1")
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict) or set(data) != {"lcd", "version"}:
+                return jsonify(error="Expected matrix settings and their version."), 400
+            if data["version"] != version:
+                return jsonify(error="Settings changed elsewhere. Reload settings before saving again."), 409
+            lcd = data["lcd"]
+            if not isinstance(lcd, dict) or set(lcd) != {"url", "spotify_account", "display_seconds"}:
+                return jsonify(error="Only the three matrix settings may be changed."), 400
+            url = lcd["url"]
+            account = lcd["spotify_account"]
+            seconds = lcd["display_seconds"]
+            if not isinstance(url, str) or len(url) > 256 or any(character.isspace() for character in url):
+                return jsonify(error="Enter a valid controller origin, or leave it empty to disable uploads."), 400
+            parsed = urlsplit(url)
+            if url and (parsed.scheme not in ("http", "https") or not parsed.hostname
+                        or parsed.username or parsed.password or parsed.path not in ("", "/")
+                        or parsed.query or parsed.fragment or parsed.port == 0):
+                return jsonify(error="Controller URL must be an HTTP(S) origin without credentials."), 400
+            if not isinstance(account, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", account):
+                return jsonify(error="Enter all, default, or a profile name (letters, digits, _ and -)."), 400
+            if type(seconds) is not int or not 1 <= seconds <= 3600:
+                return jsonify(error="Display duration must be a whole number from 1 to 3600 seconds."), 400
+            config = json.loads(content)
+            config.setdefault("lcd", {}).update(lcd)
+            updated = (json.dumps(config, indent=4) + "\n").encode("utf-8")
+            _atomic_settings_write(LCD_CONFIG_PATH + ".bak", content)
+            _atomic_settings_write(LCD_CONFIG_PATH, updated)
+            app.logger.info("Matrix configuration saved; watcher restart required.")
+            return jsonify(ok=True, version=hashlib.sha256(updated).hexdigest(), restart_required=True)
+    except (ValueError, TypeError, AttributeError):
+        return jsonify(error="Invalid matrix configuration or URL."), 400
+    except OSError:
+        app.logger.error("Could not read or save matrix configuration.")
+        return jsonify(error="Configuration unavailable; check file permissions and service logs."), 503
+
+
+@app.route("/api/settings/restart", methods=["POST"])
+def api_settings_restart():
+    denied = _settings_access(write=True)
+    if denied is not None:
+        return denied
+    if os.environ.get("TITPI_ALLOW_RESTART") != "1":
+        return jsonify(error="Browser restart is disabled. Restart titpi.service over SSH."), 403
+    try:
+        result = subprocess.run(
+            ["sudo", "-n", "/usr/bin/systemctl", "restart", "titpi.service"],
+            capture_output=True, timeout=20, check=False,
+        )
+        if result.returncode:
+            return jsonify(error="Restart failed. Check service logs and restart permissions."), 503
+    except (OSError, subprocess.TimeoutExpired):
+        return jsonify(error="Restart could not be confirmed. Check titpi.service over SSH."), 503
+    app.logger.info("Watcher restart requested through settings.")
+    return jsonify(ok=True)
 
 
 @app.route("/")

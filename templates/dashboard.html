@@ -130,6 +130,7 @@
   .navbar { max-width:1240px; margin:0 auto !important; padding:20px 38px !important; gap:24px; background:var(--page) !important; border-color:var(--line); }
   .navbar-brand { font-size:25px; display:flex; align-items:center; gap:10px; }
   .navbar-brand svg { color:var(--accent); width:25px; height:25px; }
+  .settings-link { margin-left:0; color:var(--muted); }
   .view-tabs { display:flex; gap:24px; align-self:stretch; }
   .view-tab { background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:8px 0; }
   .view-tab.active { border-color:var(--accent); color:var(--ink); }
@@ -209,8 +210,11 @@
   #dashboard-error { background:#37271d; color:#f0c7a0; border-radius:6px; padding:12px; margin-bottom:20px; }
   #bulk-bar { background:var(--surface); border-color:var(--accent); }
   @media (max-width:800px) {
-    .navbar { padding:16px 20px !important; gap:20px; }
-    .navbar-brand { font-size:23px; }
+    .navbar { display:grid; grid-template-columns:auto minmax(0,1fr) 32px; padding:16px 20px !important; gap:16px 12px; }
+    .view-tabs { justify-self:center; gap:14px; }
+    .settings-link { order:1; margin-left:auto; }
+    #date-controls { order:2; grid-column:1 / -1; }
+    .navbar-brand { font-size:23px; margin-right:0; gap:6px; }
     #date-controls { width:100%; margin:0; }
     #dashboard-shell { padding:25px 20px !important; }
     .dashboard-heading { font-size:25px; }
@@ -254,6 +258,7 @@
     <button class="nav-date-btn" onclick="goToday()" style="font-size:.75rem;color:#666;text-decoration:underline">today</button>
   </div>
   <span class="text-muted small" id="clock"></span>
+  <a class="icon-button settings-link" href="/settings" title="Settings" aria-label="Settings"><i data-lucide="settings"></i></a>
 </nav>
 <div class="container-fluid px-4" id="dashboard-shell">
   <div id="dashboard-error" role="alert" hidden></div>

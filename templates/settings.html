@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings - TitPi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root { color-scheme:dark; --page:#111312; --surface:#191c1a; --ink:#eef1ec; --muted:#9ba39e; --line:#303731; --accent:#a5cfad; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--page); color:var(--ink); font-family:'IBM Plex Sans',sans-serif; letter-spacing:0; }
+    header { max-width:1240px; margin:auto; padding:20px 38px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:14px; }
+    .brand { display:flex; align-items:center; gap:10px; font-size:25px; font-weight:600; }
+    .brand svg { color:var(--accent); width:25px; height:25px; }
+    svg { width:18px; height:18px; flex-shrink:0; }
+    a { color:var(--ink); text-decoration:none; }
+    button,input,select { font:inherit; }
+    button,a,input,select { outline-offset:3px; }
+    :focus-visible { outline:2px solid var(--accent); }
+    button { cursor:pointer; }
+    button:disabled { cursor:default; opacity:.5; }
+    .icon-button { width:36px; height:36px; flex:0 0 36px; display:inline-flex; align-items:center; justify-content:center; border:0; background:none; color:var(--muted); border-radius:4px; }
+    .icon-button:hover { color:var(--ink); background:var(--surface); }
+    #reload-button { margin-left:auto; }
+    main { max-width:900px; margin:0 auto; padding:38px; }
+    h1 { font-size:28px; font-weight:500; margin:0 0 34px; }
+    h2 { font-size:17px; font-weight:500; margin:0 0 24px; display:flex; gap:10px; align-items:center; }
+    h2 svg { color:var(--accent); }
+    section { border-top:1px solid var(--line); padding-top:26px; }
+    .field { display:grid; grid-template-columns:220px minmax(0,1fr); align-items:center; gap:16px; padding:0 0 24px; }
+    label { color:var(--muted); font-size:14px; }
+    input,select { width:100%; min-width:0; background:var(--surface); border:1px solid var(--line); color:var(--ink); border-radius:4px; min-height:42px; padding:9px 12px; }
+    #display-seconds { max-width:140px; }
+    #custom-account { margin-top:10px; }
+    .actions { display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end; padding-top:8px; }
+    .command { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:42px; border:1px solid var(--line); border-radius:4px; padding:10px 16px; color:var(--ink); background:var(--surface); }
+    .primary { color:var(--page); background:var(--accent); border-color:var(--accent); }
+    #status { font-size:14px; color:var(--accent); line-height:1.6; margin:24px 0 0; overflow-wrap:anywhere; }
+    #status.error { color:#efba9e; }
+    [hidden] { display:none !important; }
+    @media (max-width:600px) { header { padding:16px 20px; } main { padding:28px 20px; } .field { grid-template-columns:minmax(0,1fr); gap:9px; } .actions { justify-content:flex-start; } }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="icon-button" href="/" title="Back to dashboard" aria-label="Back to dashboard"><i data-lucide="arrow-left"></i></a>
+    <a class="brand" href="/"><i data-lucide="bird"></i><span>TitPi</span></a>
+    <button id="reload-button" class="icon-button" type="button" title="Reload settings" aria-label="Reload settings"><i data-lucide="refresh-cw"></i></button>
+  </header>
+  <main>
+    <h1>Settings</h1>
+    <form id="settings-form" hidden>
+      <section>
+        <h2><i data-lucide="monitor"></i>LED matrix</h2>
+        <div class="field"><label for="controller-url">Controller URL</label><input id="controller-url" type="url" maxlength="256" placeholder="http://10.0.0.81:5000" autocomplete="off"></div>
+        <div class="field">
+          <label for="spotify-account">Spotify account</label>
+          <div>
+            <select id="spotify-account"><option value="all">All profiles</option><option value="default">Controller default</option><option value="custom">Specific profile</option></select>
+            <input id="custom-account" aria-label="Spotify profile name" placeholder="Profile name" maxlength="64" pattern="[A-Za-z0-9_\-]+" autocomplete="off" hidden>
+          </div>
+        </div>
+        <div class="field"><label for="display-seconds">Display duration (seconds)</label><input id="display-seconds" type="number" min="1" max="3600" step="1" required></div>
+        <div class="actions">
+          <button id="save-button" class="command primary" type="submit" disabled><i data-lucide="save"></i>Save</button>
+          <button id="apply-button" class="command" type="button" disabled><i data-lucide="rotate-cw"></i>Apply and restart</button>
+        </div>
+      </section>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    if (window.lucide) lucide.createIcons();
+    const settingsForm = document.getElementById('settings-form');
+    const status = document.getElementById('status');
+    const account = document.getElementById('spotify-account');
+    const customAccount = document.getElementById('custom-account');
+    const saveButton = document.getElementById('save-button');
+    const applyButton = document.getElementById('apply-button');
+    const reloadButton = document.getElementById('reload-button');
+    let version = '', canRestart = false, dirty = false, busy = false;
+    function message(text, error = false) { status.textContent = text; status.classList.toggle('error', error); }
+    function updateButtons() {
+      saveButton.disabled = busy || !dirty;
+      applyButton.disabled = busy || dirty || !canRestart;
+      reloadButton.disabled = busy;
+    }
+    function profileMode() { customAccount.hidden = account.value !== 'custom'; customAccount.required = !customAccount.hidden; customAccount.disabled = customAccount.hidden; }
+    async function api(path, method = 'GET', body) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25000);
+      try {
+        const response = await fetch(path, {method, signal:controller.signal, cache:'no-store', credentials:'omit', headers:body ? {'Content-Type':'application/json'} : {}, ...(body ? {body:JSON.stringify(body)} : {})});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Request failed.');
+        return result;
+      } catch (error) {
+        if (error.name === 'AbortError') throw new Error('Request timed out. Check the service before retrying.');
+        throw error;
+      } finally { clearTimeout(timer); }
+    }
+    async function loadSettings() {
+      busy = true; updateButtons(); message('Loading settings...');
+      try {
+        const result = await api('/api/settings/lcd');
+        version = result.version; canRestart = result.can_restart; dirty = false;
+        document.getElementById('controller-url').value = result.lcd.url;
+        document.getElementById('display-seconds').value = result.lcd.display_seconds;
+        account.value = ['all','default'].includes(result.lcd.spotify_account) ? result.lcd.spotify_account : 'custom';
+        customAccount.value = account.value === 'custom' ? result.lcd.spotify_account : '';
+        profileMode(); settingsForm.hidden = false; message('');
+      } catch (error) { message(error.message, true); }
+      finally { busy = false; updateButtons(); }
+    }
+    account.addEventListener('change', profileMode);
+    settingsForm.addEventListener('input', () => { dirty = true; updateButtons(); });
+    settingsForm.addEventListener('change', () => { dirty = true; updateButtons(); });
+    settingsForm.addEventListener('submit', async event => {
+      event.preventDefault(); busy = true; updateButtons();
+      try {
+        const result = await api('/api/settings/lcd', 'PATCH', {version, lcd:{url:document.getElementById('controller-url').value.trim(), spotify_account:account.value === 'custom' ? customAccount.value.trim() : account.value, display_seconds:Number(document.getElementById('display-seconds').value)}});
+        version = result.version; dirty = false;
+        message(canRestart ? 'Saved. Restart the watcher to apply.' : 'Saved. Restart titpi.service over SSH to apply.');
+      } catch (error) { message(error.message, true); }
+      finally { busy = false; updateButtons(); }
+    });
+    applyButton.addEventListener('click', async () => {
+      if (!confirm('Restart the watcher? Any active recording will be interrupted.')) return;
+      busy = true; updateButtons(); message('Restarting watcher...');
+      try { await api('/api/settings/restart', 'POST', {}); message('Restart requested. Changes apply when the watcher starts.'); }
+      catch (error) { message(error.message, true); }
+      finally { busy = false; updateButtons(); }
+    });
+    reloadButton.addEventListener('click', () => { if (!dirty || confirm('Discard unsaved changes and reload settings?')) loadSettings(); });
+    window.addEventListener('beforeunload', event => { if (dirty || busy) { event.preventDefault(); event.returnValue = ''; } });
+    window.addEventListener('pageshow', event => { if (event.persisted) loadSettings(); });
+    loadSettings();
+  </script>
+</body>
+</html>

@@ -49,9 +49,17 @@ rsync -az \
     --exclude='*.pyc' \
     --exclude=detections/ \
     --exclude=config.json \
+    --exclude=config_lcd.json \
+    --exclude='config_lcd.json.*' \
+    --exclude='.titpi-settings-*' \
     --progress \
     "$LOCAL_DIR/" "$PI_USER@$PI_HOST:$PI_DIR/"
 ok "Code synced"
+
+if [[ -f "$LOCAL_DIR/config_lcd.json" ]]; then
+    info "Initializing matrix config only if absent on the Pi..."
+    rsync -az --ignore-existing "$LOCAL_DIR/config_lcd.json" "$PI_USER@$PI_HOST:$PI_DIR/"
+fi
 
 # If no mode specified, just restart services and exit (update mode)
 if [ -z "$CAMERA_MODE" ]; then

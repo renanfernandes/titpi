@@ -4,6 +4,12 @@ HTML templates rendered by `notifier.py` / `notifier_lcd.py`. They use a minimal
 
 ---
 
+## settings.html — Matrix settings
+
+Opened by the dashboard's small header gear. This separate Flask page loads matrix URL, Spotify profile selection, and display duration directly, without a password, with separate Save and optional Apply and restart actions. It uses the dashboard's charcoal/green palette and Lucide icons without adding another dashboard tab. Other configuration sections are not editable in this first version. Access is trusted to the internal network; same-origin write checks, validation, backups, and conflict detection remain enabled.
+
+See [service setup](../services/README.md#settings-page-first-time-setup) for LAN access, optional restart permissions, validation, and rollback. The original custom email renderer is not used for this page.
+
 ## email.html — Detection alert email
 
 Sent on every confirmed detection. Rendered with the following context variables:
@@ -34,7 +40,7 @@ bash ./deploy.sh 10.0.0.80
 ssh titpi@10.0.0.80 'systemctl is-active titpi.service titpi-web.service'
 ```
 
-Both services should report `active`. The deployment script copies other local project changes and LCD configuration too; it preserves the Pi's credentials in `config.json` while updating `database.web_host`.
+Both services should report `active`. The deployment script copies other local project changes; it preserves existing LCD configuration on the Pi (initializing it only when absent), and preserves credentials in `config.json` while updating `database.web_host`.
 
 To send a basic test email from the Pi without uploading an image to the matrix:
 
