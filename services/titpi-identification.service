@@ -1,0 +1,19 @@
+[Unit]
+Description=TitPi persistent remote identification worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=titpi
+WorkingDirectory=/home/titpi/titpi
+ExecStart=/usr/bin/python3 -u /home/titpi/titpi/identification_worker.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=310
+UMask=0077
+NoNewPrivileges=true
+EnvironmentFile=-/home/titpi/.config/titpi/worker.env
+
+[Install]
+WantedBy=multi-user.target

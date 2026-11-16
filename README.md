@@ -26,7 +26,8 @@ watcher.py ── spike detection + baseline calibration
   ▼
 bird_id.py ── local TFLite classifier (AIY Birds V1, 964 species)
   │             ↓ confident (≥30%)? → done
-  │             ↓ uncertain? → GPT-4o-mini fallback
+  │             ↓ uncertain? → selected Hermes SSH / OpenAI / Claude fallback
+  │             ↓ empty/inconclusive/error? → retain media, no alert
   │             applies species aliases
   ▼
 database.py ── SQLite (detections + bird_of_day tables)
@@ -36,28 +37,41 @@ database.py ── SQLite (detections + bird_of_day tables)
   └─▶ web.py            Flask dashboard on port 8080
 ```
 
-The IMX500 runs neural network inference directly on the sensor chip — the Pi barely wakes up until something interesting happens. Detection score spikes above a rolling baseline trigger a capture. A two-stage pipeline then identifies the species: fast local TFLite model first, GPT-4o-mini fallback for uncertain or tricky shots.
+The IMX500 runs neural network inference directly on the sensor chip — the Pi barely wakes up until something interesting happens. Detection score spikes above a rolling baseline trigger a capture. The local TFLite classifier is always attempted first. Only when every local candidate fails or falls below the configured confidence threshold does one selected photo go to the configured fallback. Only accepted identifications create visitor records. Hermes diagnostic email (`hermes_ssh.notify_all`, enabled by default) also sends photos for unknown species, low confidence, empty, inconclusive and failed jobs, without creating visitor records or triggering the matrix.
+
+Choose `none` (local only, the default), `hermes_ssh` (persistent queue), `openai`, or `claude` in JSON or the web Settings page. Hermes receives a resized JPEG through SSH/SFTP and uses its server's default model; one separate worker keeps remote waiting out of the camera loop. The shared bird prompt is editable for every provider. See [the operational runbook](services/README.md#hermes-ssh-queue) for SSH setup, validation, and rollback. Species guesses and confidence are not independently verified.
 
 ## Features
 
 - **On-chip object detection** — IMX500 runs SSD MobileNet v2 at ~10 FPS with near-zero CPU load
 - **Spike-based triggering** — adaptive baseline calibration prevents false positives from lighting changes
-- **Dual species identification** — local TFLite classifier (Google AIY Birds V1, 964 species) runs first; GPT-4o-mini fallback for uncertain IDs
+- **Local species identification** — local TFLite classifier (Google AIY Birds V1, 964 species); only confident matches receive a species label
 - **Species aliases** — normalizes variant names to canonical species via `species_aliases.json`
-- **False positive cleanup** — automatically deletes photos/videos when neither classifier identifies anything
+- **Configurable fallback** — local-only, queued Hermes SSH, OpenAI API or Claude API; bounded processing and resized JPEGs, with local classification always first
+- **Uncertain capture retention** — unresolved captures stay out of the dashboard; optional Hermes diagnostic emails include them for review while original media remain retained
 - **High-res capture** — 2028×1520 stills + H264 video (10–120s) on each confirmed detection
 - **Web dashboard** — photo-first Visits view, shared-period Insights with ranked labels and activity charts, GitHub-style yearly heatmap, photo lightbox
-- **Bulk management** — multi-select detections for bulk edit or delete from the dashboard
+- **Bulk management** — multi-select detections for bulk edit or delete; deleting a visit permanently removes its associated photos and video, except media shared with surviving visits
 - **Bird of the Day** — daily ranking that prioritizes first-ever sightings, with photos saved to `detections/bird_of_the_day/`
-- **Email alerts** — per-detection notifications with photo attachment; video attached or linked (configurable)
+- **Email alerts** — one final email per visit: after local identification, or after the selected remote fallback returns; photo attachment and optional video
 - **Auto-recovery** — systemd services with crash restart + frozen-pipeline detection (`os._exit` on camera hang)
 - **Dual camera support** — works with IMX500 (AI Camera, on-chip detection) or Camera Module 3 (motion detection mode)
 
 ## Dashboard
 
-![TitPi dashboard — visit counts, Bird of the Day, and species breakdown](images/dashboard.png)
+### Visits
 
-![TitPi dashboard — activity heatmap and detection table](images/dashboard2.png)
+![TitPi Visits view with feeder photos, species labels, video controls, and the settings gear](images/dashboard.png)
+
+### Insights
+
+![TitPi Insights view with daily activity, hourly visits, frequent visitors, and the expanded yearly heatmap](images/dashboard2.png)
+
+### Settings
+
+The header gear opens camera, capture tuning, email, identification, dashboard/storage, and LED matrix settings. Set `email.subject_prefix` separately on each Pi, for example `TitPi - Garden`, to identify the camera in normal and diagnostic email subjects. The default remains `TitPi`. Passwords and API keys are never preloaded into the browser; blank fields preserve them. All supported JSON fields have controls, with the mandatory local classifier shown enabled/read-only. See [configuration setup and rollback](services/README.md#per-pi-email-and-complete-settings) for applying changes and storage-path precautions.
+
+![TitPi settings page with controller URL, Spotify profile selection, and photo display duration](images/settings.png)
 
 ## Hardware
 
@@ -79,7 +93,10 @@ Case design by **[Hanz](https://makerworld.com/en/@Hanz_3D_zz)** — [Raspberry 
 
 ```
 watcher.py            Main detection loop (always-on)
-bird_id.py            Dual identification (local TFLite + GPT fallback)
+bird_id.py            Mandatory local classification + selected remote fallback
+hermes_ssh.py         Bounded SSH/SFTP image transport and result validation
+identification_queue.py  Persistent jobs and atomic publication in SQLite
+identification_worker.py Single asynchronous Hermes queue consumer
 bird_classify.py      TFLite classifier wrapper (AIY Birds V1)
 database.py           SQLite schema and queries
 web.py                Flask dashboard backend
@@ -118,7 +135,7 @@ pip install --break-system-packages --user ai-edge-litert
 git clone https://github.com/your-user/titpi.git /home/titpi/titpi
 cd /home/titpi/titpi
 cp config_example.json config.json
-# Edit config.json with your GitHub token, email credentials, and paths
+# Edit config.json with your email credentials, classifier settings, and paths
 ```
 
 ### 3. Set up systemd services
@@ -137,18 +154,21 @@ Copy `config_example.json` to `config.json` and fill in your values:
 
 | Section | Key | Description |
 |---------|-----|-------------|
-| `camera` | `mode` | `"imx500"` (AI Camera) or `"motion"` (Camera Module 3) |
+| `camera` | `mode` | `"imx500"` (AI Camera) or `"motion"` (Camera Module 3); also editable in web Settings, with explicit camera restart |
 | `camera` | `confidence_threshold` | Minimum IMX500 detection score (default: 0.25) |
 | `camera` | `spike_threshold` | Margin above baseline to trigger (default: 0.20) |
 | `camera` | `baseline_frames` | Frames used to calibrate the idle baseline (default: 60) |
 | `camera` | `confirmation_frames` | Consecutive spike frames required (default: 2) |
 | `camera` | `cooldown` | Seconds between detections (default: 10) |
 | `camera` | `target_labels` | COCO classes to detect (default: bird, person, dog) |
-| `github` | `token` | GitHub PAT with Models permission |
-| `github` | `model` | Vision model name (default: gpt-4o-mini) |
+| `identification` | `provider` | `none`, `hermes_ssh`, `openai` or `claude`; local is always first |
+| `identification` | `prompt` | Editable bird/species/no-bird instructions shared by remote providers |
+| `identification` | `timeout`, `max_attempts` | Direct API read timeout (1–60 seconds), attempts (1–3) |
+| `openai` | `model`, `api_key` | Vision model and separately billed API key; `OPENAI_API_KEY` takes precedence |
+| `claude` | `model`, `api_key` | Vision model and separately billed API key; `ANTHROPIC_API_KEY` takes precedence |
 | `email` | `password` | SMTP app password for notifications |
 | `email` | `attach_video` | Attach video file to email; `false` sends a link instead (default: true) |
-| `local_classifier` | `enabled` | Enable local TFLite bird classifier (default: true) |
+| `local_classifier` | `enabled` | Always required; legacy `false` does not disable local classification |
 | `local_classifier` | `min_confidence` | Minimum score to trust local ID (default: 0.3) |
 
 ## Development
@@ -156,7 +176,7 @@ Copy `config_example.json` to `config.json` and fill in your values:
 ### Sync files to the Pi
 
 ```bash
-rsync -az --progress ./ titpi@titpi.local:/home/titpi/titpi
+./deploy.sh 10.0.0.80
 ```
 
 ### Restart after changes

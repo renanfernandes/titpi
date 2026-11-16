@@ -18,6 +18,7 @@
         "motion_min_area": 0.01
     },
     "email": {
+        "subject_prefix": "TitPi",
         "smtp_host": "smtp.gmail.com",
         "smtp_port": 587,
         "from": "",
@@ -29,9 +30,30 @@
         "enabled": true,
         "min_confidence": 0.3
     },
-    "github": {
-        "token": "",
-        "model": "",
-        "identify_all": true
+    "identification": {
+        "provider": "none",
+        "timeout": 30,
+        "max_attempts": 2,
+        "prompt": "Examine the attached image carefully. Is a bird visible? If so, identify which bird and species it is from visible features, giving its common name and scientific name only when supported by the image. Do not assume a bird is present or infer a species from the feeder or background. If blur, occlusion, or image quality prevents deciding whether a bird is present, use inconclusive rather than empty. Return ONLY a JSON object with status (empty, identified, inconclusive), common_name (string or null), name (Latin binomial or null), category (bird or unknown), confidence (0 to 1), and notes. Identify birds only; no bird means empty. For identified use category bird. If a bird is visible but its species is uncertain, use common_name \"Unidentified bird\" and name null; never invent a scientific name. For empty/inconclusive use null names, category unknown and confidence 0."
+    },
+    "hermes_ssh": {
+        "host": "10.0.0.3",
+        "user": "renanfernandes",
+        "key_path": "/home/titpi/.ssh/id_ed25519_macmini",
+        "remote_temp_dir": "/tmp",
+        "hermes_path": "/Users/renanfernandes/.local/bin/hermes",
+        "connect_timeout": 10,
+        "timeout": 60,
+        "max_attempts": 1,
+        "min_confidence": 0.7,
+        "notify_all": true
+    },
+    "openai": {
+        "model": "gpt-4.1-mini",
+        "api_key": ""
+    },
+    "claude": {
+        "model": "claude-haiku-4-5",
+        "api_key": ""
     }
 }

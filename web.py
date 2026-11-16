@@ -6,6 +6,7 @@ Run: python3 web.py  (or via titpi-web.service on port 8080)
 import os
 import json
 import re
+import math
 import hashlib
 import tempfile
 import fcntl
@@ -14,6 +15,8 @@ from datetime import date
 from urllib.parse import urlsplit
 from flask import Flask, jsonify, send_from_directory, abort, render_template, request
 import database
+from bird_id import DEFAULT_PROMPT
+from hermes_ssh import DEFAULT_SETTINGS, validate_settings
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 with open(CONFIG_PATH) as _f:
@@ -25,6 +28,41 @@ PORT = _cfg.get("database", {}).get("web_port", 8080)
 database.init_db()
 app = Flask(__name__)
 LCD_CONFIG_PATH = os.path.join(os.path.dirname(CONFIG_PATH), "config_lcd.json")
+
+GENERAL_SETTINGS = {
+    "camera": {
+        "model_path": {"label": "IMX500 model path", "type": "path", "default": "/usr/share/imx500-models/imx500_network_efficientdet_lite0_pp.rpk"},
+        "confidence_threshold": {"label": "Detection confidence (0-1)", "type": "number", "default": 0.35, "min": 0, "max": 1},
+        "confirmation_frames": {"label": "Confirmation frames", "type": "integer", "default": 3, "min": 1, "max": 10000},
+        "photo_delay": {"label": "Photo delay (seconds)", "type": "number", "default": 0.5, "min": 0, "max": 86400},
+        "video_min_duration": {"label": "Minimum video duration (seconds)", "type": "number", "default": 10, "min": 0, "max": 86400},
+        "video_max_duration": {"label": "Maximum video duration (seconds)", "type": "number", "default": 120, "min": 1, "max": 86400},
+        "video_idle_timeout": {"label": "Video idle timeout (seconds)", "type": "number", "default": 5, "min": 0.1, "max": 86400},
+        "photo_interval": {"label": "Photo interval (seconds)", "type": "number", "default": 3, "min": 0.1, "max": 86400},
+        "cooldown": {"label": "Visit cooldown (seconds)", "type": "number", "default": 15, "min": 0, "max": 86400},
+        "save_directory": {"label": "Capture directory", "type": "path", "default": "/home/titpi/titpi/detections"},
+        "log_file": {"label": "Log file path", "type": "path", "default": "", "optional": True},
+        "target_labels": {"label": "Detection targets", "type": "list", "default": ["bird"]},
+        "spike_threshold": {"label": "Spike threshold", "type": "number", "default": 0.2, "min": 0, "max": 1000},
+        "baseline_frames": {"label": "Baseline frames", "type": "integer", "default": 60, "min": 1, "max": 10000},
+        "motion_threshold": {"label": "Motion threshold (pixel difference)", "type": "number", "default": 5, "min": 0, "max": 255},
+        "motion_min_area": {"label": "Minimum motion area (0-1)", "type": "number", "default": 0.01, "min": 0, "max": 1},
+    },
+    "email": {
+        "subject_prefix": {"label": "Email subject prefix", "type": "text", "default": "TitPi", "max_length": 120},
+        "smtp_host": {"label": "SMTP host", "type": "host", "default": "smtp.gmail.com"},
+        "smtp_port": {"label": "SMTP port", "type": "integer", "default": 587, "min": 1, "max": 65535},
+        "from": {"label": "Sender address", "type": "email", "default": ""},
+        "password": {"label": "SMTP password", "type": "password", "default": ""},
+        "to": {"label": "Recipient address", "type": "email", "default": ""},
+        "attach_video": {"label": "Attach video to email", "type": "boolean", "default": True},
+    },
+    "database": {
+        "path": {"label": "Database file path", "type": "path", "default": "", "optional": True},
+        "web_host": {"label": "Dashboard host in email links", "type": "host", "default": "10.0.1.60"},
+        "web_port": {"label": "Dashboard port", "type": "integer", "default": 8080, "min": 1, "max": 65535},
+    },
+}
 
 
 def _settings_access(write=False):
@@ -55,6 +93,211 @@ def _atomic_settings_write(path, content):
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def _identification_settings(content):
+    config = json.loads(content)
+    remote = config.get("identification", {})
+    provider = remote.get("provider", "none")
+    return {
+        "identification": {"provider": provider if provider in ("openai", "claude", "hermes_ssh") else "none",
+                           "timeout": remote.get("timeout", 30), "max_attempts": remote.get("max_attempts", 2),
+                           "prompt": remote.get("prompt") or DEFAULT_PROMPT},
+        "local_classifier": {"enabled": True, "min_confidence": config.get("local_classifier", {}).get("min_confidence", 0.3)},
+        "hermes_ssh": {**DEFAULT_SETTINGS, **{key: value for key, value in config.get("hermes_ssh", {}).items() if key in DEFAULT_SETTINGS}},
+        "openai": {"model": config.get("openai", {}).get("model") or "gpt-4.1-mini",
+                   "api_key_configured": bool(os.environ.get("OPENAI_API_KEY") or config.get("openai", {}).get("api_key"))},
+        "claude": {"model": config.get("claude", {}).get("model") or "claude-haiku-4-5",
+                   "api_key_configured": bool(os.environ.get("ANTHROPIC_API_KEY") or config.get("claude", {}).get("api_key"))},
+    }
+
+
+def _validate_general_value(field, value):
+    kind = field["type"]
+    if kind == "boolean":
+        valid = type(value) is bool
+    elif kind in ("number", "integer"):
+        valid = (type(value) in ((int,) if kind == "integer" else (int, float))
+                 and field["min"] <= value <= field["max"] and math.isfinite(value))
+    elif kind == "list":
+        valid = (isinstance(value, list) and 1 <= len(value) <= 100
+                 and all(isinstance(item, str) and re.fullmatch(r"[a-z][a-z0-9 -]{0,63}", item) for item in value)
+                 and len(set(value)) == len(value))
+    else:
+        valid = (isinstance(value, str) and len(value) <= field.get("max_length", 1024)
+                 and not any(ord(character) < 32 or ord(character) == 127 for character in value))
+        if valid and kind == "path":
+            valid = value.startswith("/") or (not value and field.get("optional", False))
+        elif valid and kind == "host":
+            valid = bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]{0,252}", value))
+        elif valid and kind == "email":
+            valid = not value or bool(re.fullmatch(r"[^\s@<>]+@[^\s@<>]+", value))
+        elif valid and kind == "text":
+            valid = bool(value.strip())
+    if not valid:
+        raise ValueError("Invalid setting value")
+
+
+@app.route("/api/settings/general", methods=["GET", "PATCH"])
+def api_settings_general():
+    denied = _settings_access(write=request.method == "PATCH")
+    if denied is not None:
+        return denied
+    try:
+        with open(CONFIG_PATH + ".lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            with open(CONFIG_PATH, "rb") as config_file:
+                content = config_file.read()
+            config = json.loads(content)
+            version = hashlib.sha256(content).hexdigest()
+            if request.method == "GET":
+                values = {section: {key: config.get(section, {}).get(key, field["default"])
+                                    for key, field in fields.items() if field["type"] != "password"}
+                          for section, fields in GENERAL_SETTINGS.items()}
+                return jsonify(settings=values, schema=GENERAL_SETTINGS, version=version,
+                               password_configured=bool(config.get("email", {}).get("password")),
+                               can_restart=os.environ.get("TITPI_ALLOW_RESTART") == "1")
+            if request.content_length and request.content_length > 16384:
+                return jsonify(error="Settings request is too large."), 413
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict) or set(data) != {"settings", "version"}:
+                return jsonify(error="Expected settings and their version."), 400
+            if data["version"] != version:
+                return jsonify(error="Settings changed elsewhere. Reload before saving."), 409
+            changes = data["settings"]
+            if not isinstance(changes, dict) or not changes or set(changes) - GENERAL_SETTINGS.keys():
+                return jsonify(error="Select supported configuration fields."), 400
+            for section, values in changes.items():
+                if not isinstance(values, dict) or not values or set(values) - GENERAL_SETTINGS[section].keys():
+                    return jsonify(error="Select supported configuration fields."), 400
+                for key, value in values.items():
+                    field = GENERAL_SETTINGS[section][key]
+                    _validate_general_value(field, value)
+                    if field["type"] == "password" and not value:
+                        continue
+                    if field.get("optional") and value == "":
+                        config.setdefault(section, {}).pop(key, None)
+                    else:
+                        config.setdefault(section, {})[key] = value
+            camera = config.get("camera", {})
+            if camera.get("video_min_duration", 10) > camera.get("video_max_duration", 120):
+                return jsonify(error="Minimum video duration cannot exceed maximum duration."), 400
+            updated = (json.dumps(config, indent=4) + "\n").encode("utf-8")
+            _atomic_settings_write(CONFIG_PATH + ".bak", content)
+            _atomic_settings_write(CONFIG_PATH, updated)
+            app.logger.info("General configuration saved; service restarts required.")
+            return jsonify(ok=True, version=hashlib.sha256(updated).hexdigest(), restart_required=True)
+    except (ValueError, TypeError, AttributeError):
+        return jsonify(error="Invalid configuration value; check field types and limits."), 400
+    except OSError:
+        app.logger.error("Could not read or save general configuration.")
+        return jsonify(error="Configuration unavailable; check file permissions and service logs."), 503
+
+
+@app.route("/api/settings/camera", methods=["GET", "PATCH"])
+def api_settings_camera():
+    denied = _settings_access(write=request.method == "PATCH")
+    if denied is not None:
+        return denied
+    try:
+        with open(CONFIG_PATH + ".lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            with open(CONFIG_PATH, "rb") as config_file:
+                content = config_file.read()
+            config = json.loads(content)
+            version = hashlib.sha256(content).hexdigest()
+            if request.method == "GET":
+                return jsonify(camera={"mode": config.get("camera", {}).get("mode", "imx500")},
+                               version=version, can_restart=os.environ.get("TITPI_ALLOW_RESTART") == "1")
+            if request.content_length and request.content_length > 4096:
+                return jsonify(error="Settings request is too large."), 413
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict) or set(data) != {"camera", "version"}:
+                return jsonify(error="Expected camera mode and its version."), 400
+            if data["version"] != version:
+                return jsonify(error="Settings changed elsewhere. Reload before saving."), 409
+            camera = data["camera"]
+            if (not isinstance(camera, dict) or set(camera) != {"mode"}
+                    or camera["mode"] not in ("imx500", "motion")):
+                return jsonify(error="Select imx500 or motion (Camera Module 3)."), 400
+            config.setdefault("camera", {})["mode"] = camera["mode"]
+            updated = (json.dumps(config, indent=4) + "\n").encode("utf-8")
+            _atomic_settings_write(CONFIG_PATH + ".bak", content)
+            _atomic_settings_write(CONFIG_PATH, updated)
+            app.logger.info("Camera mode saved; watcher restart required.")
+            return jsonify(ok=True, version=hashlib.sha256(updated).hexdigest(), restart_required=True)
+    except (ValueError, TypeError, AttributeError):
+        return jsonify(error="Invalid camera configuration."), 400
+    except OSError:
+        app.logger.error("Could not read or save camera configuration.")
+        return jsonify(error="Configuration unavailable; check file permissions and service logs."), 503
+
+
+@app.route("/api/settings/identification", methods=["GET", "PATCH"])
+def api_settings_identification():
+    denied = _settings_access(write=request.method == "PATCH")
+    if denied is not None:
+        return denied
+    try:
+        with open(CONFIG_PATH + ".lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            with open(CONFIG_PATH, "rb") as config_file:
+                content = config_file.read()
+            version = hashlib.sha256(content).hexdigest()
+            if request.method == "GET":
+                return jsonify(**_identification_settings(content), version=version,
+                               can_restart=os.environ.get("TITPI_ALLOW_RESTART") == "1")
+            if request.content_length and request.content_length > 16384:
+                return jsonify(error="Settings request is too large."), 413
+            data = request.get_json(silent=True)
+            sections = {"identification", "local_classifier", "hermes_ssh", "openai", "claude"}
+            if not isinstance(data, dict) or set(data) != sections | {"version"}:
+                return jsonify(error="Expected identification settings and their version."), 400
+            if data["version"] != version:
+                return jsonify(error="Settings changed elsewhere. Reload before saving."), 409
+            remote, local = data["identification"], data["local_classifier"]
+            if not isinstance(remote, dict) or set(remote) != {"provider", "timeout", "max_attempts", "prompt"}:
+                return jsonify(error="Invalid remote settings."), 400
+            if remote["provider"] not in ("none", "openai", "claude", "hermes_ssh"):
+                return jsonify(error="Select none, openai, claude or hermes_ssh."), 400
+            validate_settings(data["hermes_ssh"])
+            if not isinstance(remote["prompt"], str) or not remote["prompt"].strip() or len(remote["prompt"]) > 4000:
+                return jsonify(error="Enter an identification prompt of 1 to 4000 characters."), 400
+            if not isinstance(local, dict) or set(local) != {"min_confidence"}:
+                return jsonify(error="The local model is mandatory; only its confidence threshold may change."), 400
+            confidence = local["min_confidence"]
+            if type(confidence) not in (int, float) or not 0.01 <= confidence <= 1:
+                return jsonify(error="Local confidence must be between 0.01 and 1."), 400
+            if type(remote["timeout"]) is not int or not 1 <= remote["timeout"] <= 60:
+                return jsonify(error="Timeout must be a whole number from 1 to 60 seconds."), 400
+            if type(remote["max_attempts"]) is not int or not 1 <= remote["max_attempts"] <= 3:
+                return jsonify(error="Attempts must be a whole number from 1 to 3."), 400
+            for provider in ("openai", "claude"):
+                settings = data[provider]
+                if not isinstance(settings, dict) or set(settings) - {"model", "api_key"} or "model" not in settings:
+                    return jsonify(error="Invalid API provider settings."), 400
+                if not isinstance(settings["model"], str) or not re.fullmatch(r"[A-Za-z0-9_./:-]{1,128}", settings["model"]):
+                    return jsonify(error="Enter a valid model identifier."), 400
+            for settings, field in ((data["openai"], "api_key"), (data["claude"], "api_key")):
+                if field in settings and (not isinstance(settings[field], str) or len(settings[field]) > 1024
+                                          or any(ord(character) < 32 for character in settings[field])):
+                    return jsonify(error="Invalid credential value."), 400
+            config = json.loads(content)
+            for section in sections:
+                values = {key: value for key, value in data[section].items()
+                          if key != "api_key" or value}
+                config.setdefault(section, {}).update(values)
+            config["local_classifier"]["enabled"] = True
+            updated = (json.dumps(config, indent=4) + "\n").encode("utf-8")
+            _atomic_settings_write(CONFIG_PATH + ".bak", content)
+            _atomic_settings_write(CONFIG_PATH, updated)
+            app.logger.info("Identification configuration saved; watcher restart required.")
+            return jsonify(ok=True, version=hashlib.sha256(updated).hexdigest(), restart_required=True)
+    except (ValueError, TypeError, AttributeError, KeyError):
+        return jsonify(error="Invalid identification configuration."), 400
+    except OSError:
+        app.logger.error("Could not read or save identification configuration.")
+        return jsonify(error="Configuration unavailable; check file permissions and service logs."), 503
 
 
 @app.after_request
@@ -276,7 +519,11 @@ def api_daily():
 
 @app.route("/api/detection/<int:detection_id>", methods=["DELETE"])
 def api_delete_detection(detection_id):
-    deleted = database.delete_detection(detection_id)
+    try:
+        deleted = database.delete_detection(detection_id)
+    except OSError as error:
+        app.logger.error('Visit %s media cleanup failed (%s); row retained.', detection_id, type(error).__name__)
+        return jsonify({"ok": False, "error": "Media cleanup failed; visit retained. Retry deletion."}), 503
     if not deleted:
         abort(404)
     return jsonify({"ok": True})
@@ -324,8 +571,13 @@ def api_bulk_delete():
         abort(400)
     deleted = 0
     for det_id in ids:
-        if database.delete_detection(det_id):
-            deleted += 1
+        try:
+            if database.delete_detection(det_id):
+                deleted += 1
+        except OSError as error:
+            app.logger.error('Visit %s media cleanup failed (%s); row retained.', det_id, type(error).__name__)
+            return jsonify({"ok": False, "deleted": deleted,
+                            "error": "Media cleanup failed; remaining visits retained. Retry deletion."}), 503
     return jsonify({"ok": True, "deleted": deleted})
 
 

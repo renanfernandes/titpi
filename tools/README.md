@@ -24,6 +24,19 @@ Open http://127.0.0.1:8082. The server is localhost-only and proxies GET request
 
 ---
 
+## Identification transport checks
+
+Run the local-only regression suites without camera hardware, real mail, or paid inference:
+
+```bash
+cd "/Users/renanfernandes/Documents/github/titpi"
+.venv/bin/python -m unittest tools.test_identification tools.test_settings -v
+```
+
+Tests cover mandatory local-first routing, API and queued SSH modes, configurable bird prompts, no-bird/unclear results, JPEG resizing, bounded transport, strict host checking, safe paths, persistent queue recovery, duplicate publication protection, atomic settings backups and conflicts. Provider/SMTP calls are mocked. See [the Hermes SSH runbook](../services/README.md#hermes-ssh-queue).
+
+---
+
 ## preview.py — Live camera preview
 
 Streams a live MJPEG feed over HTTP so you can aim and focus the camera before starting the main service.

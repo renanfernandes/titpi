@@ -12,10 +12,12 @@ from picamera2.encoders import H264Encoder
 from picamera2.outputs import FfmpegOutput
 #from notifier import send_detection_email
 from notifier_lcd import send_detection_email
+from notifier import send_detection_email as send_diagnostic_email
 import threading as _threading
-from bird_id import identify_image
+from bird_id import REMOTE_ENABLED, REMOTE_QUEUED, identify_image
+from identification_queue import IdentificationQueue
 
-# Rate-limit GPT calls: at most one per 30s across all detections
+# Rate-limit cloud calls: at most one per 30s across all detections
 _gpt_lock = _threading.Lock()
 _gpt_last_call = 0.0
 GPT_MIN_INTERVAL = 30.0  # seconds
@@ -26,16 +28,17 @@ def _rate_limited_identify(photo_path, label):
         since = time.time() - _gpt_last_call
         if since < GPT_MIN_INTERVAL:
             wait = GPT_MIN_INTERVAL - since
-            log.info(f"[GPT] Throttling: waiting {wait:.1f}s before next API call")
+            log.info(f"[Remote] Throttling: waiting {wait:.1f}s before next API call")
             time.sleep(wait)
         _gpt_last_call = time.time()
-    return identify_image(photo_path, label)
+    return identify_image(photo_path, label, return_outcome=True)
 import database
 
 # --- Configuration ---
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 with open(CONFIG_PATH) as _f:
-    _cfg = json.load(_f)["camera"]
+    _settings = json.load(_f)
+    _cfg = _settings["camera"]
 
 DEBUG = "--debug" in sys.argv
 CAMERA_MODE   = _cfg.get("mode", "imx500")  # "imx500" or "motion"
@@ -178,7 +181,11 @@ def get_top_score(np_outputs):
 def get_motion_score():
     """Compute motion magnitude from consecutive lores frames. Returns (label, score)."""
     global prev_frame
-    lores = picam2.capture_array("lores")
+    signal.alarm(15)
+    try:
+        lores = picam2.capture_array("lores")
+    finally:
+        signal.alarm(0)
     # Use only Y channel (first 320x240 bytes of YUV420)
     gray = lores[:240, :320].astype(np.float32) if lores.ndim == 3 else lores.astype(np.float32)
     if len(gray.shape) == 3:
@@ -302,29 +309,40 @@ def identify_best(photo_path, extra_photos, label):
     """Run identification on photos, return best_species dict.
     
     Tries each photo with local classifier first. If a confident local
-    match is found, returns immediately. Only falls back to GPT on the
+    match is found, returns immediately. Only uses the configured fallback on the
     single best-quality photo if local fails on all of them.
     """
     all_photos = [photo_path] + extra_photos
-    best_species, best_photo, best_score = None, photo_path, -1
+    best_species, best_photo, best_quality = None, photo_path, -1
 
     # Pass 1: try local classifier on each photo (fast, no network)
     for p in all_photos:
         try:
             from PIL import Image as _Image
-            _img = _Image.open(p)
-            _img.save(p, quality=95, subsampling=0)
+            from PIL import ImageFilter as _ImageFilter, ImageStat as _ImageStat
+            with _Image.open(p) as image:
+                thumbnail = image.convert("L")
+                thumbnail.thumbnail((320, 240))
+                quality = _ImageStat.Stat(thumbnail.filter(_ImageFilter.FIND_EDGES)).var[0]
+            if quality > best_quality:
+                best_quality = quality
+                best_photo = p
         except Exception:
             pass
-        result = _rate_limited_identify(p, label)
-        if result and result.get("score", 0) > best_score:
-            best_score = result["score"]
+        result = identify_image(p, label, local_only=True)
+        if result:
             best_species = result
             best_photo = p
-            log.info(f"Best photo: {os.path.basename(p)} (conf={best_score:.0%})")
-            # If local classifier is confident, stop early
-            if result.get("source") == "local" and best_score >= 0.3:
-                break
+            log.info(f"Best photo: {os.path.basename(p)} (conf={result['score']:.0%})")
+            break
+
+    if best_species is None and REMOTE_QUEUED:
+        return {"status": "queued", "photo_path": best_photo}
+    if best_species is None and REMOTE_ENABLED:
+        log.info(f"No confident local identification; trying configured provider on {os.path.basename(best_photo)}")
+        best_species = _rate_limited_identify(best_photo, label)
+    if not best_species or best_species.get("status", "identified") != "identified":
+        return best_species
 
     # Clean up extras we didn't pick
     for p in extra_photos:
@@ -350,6 +368,7 @@ spike_streak = 0
 last_capture = 0
 last_output_change = time.time()
 last_output_sig = None
+missing_output_since = None
 FROZEN_TIMEOUT = 120  # exit if model output unchanged for 2 minutes
 
 try:
@@ -361,8 +380,14 @@ try:
             signal.alarm(0)
 
             if out is None:
+                if missing_output_since is None:
+                    missing_output_since = time.monotonic()
+                elif time.monotonic() - missing_output_since > FROZEN_TIMEOUT:
+                    log.error(f"AI pipeline produced no output for {FROZEN_TIMEOUT}s, exiting for restart...")
+                    os._exit(1)
                 time.sleep(0.1)
                 continue
+            missing_output_since = None
 
             # Detect frozen AI pipeline: same output for too long
             sig = bytes(out[1][0].data) if hasattr(out[1][0], 'data') else out[1][0].tobytes()
@@ -421,30 +446,41 @@ try:
         visit_duration = time.time() - detection_start
         species = identify_best(photo_path, extra_photos, confirmed)
 
-        # If neither local model nor GPT identified anything, discard as false positive
-        if not species:
-            log.info("No species identified by local model or GPT — discarding false positive.")
-            for f in [photo_path, video_path]:
-                try:
-                    if f and os.path.isfile(f):
-                        os.remove(f)
-                except OSError:
-                    pass
-            last_capture = time.time()
-            continue
-
-        send_detection_email(confirmed, conf_score, photo_path, video_path, species)
-        database.log_detection(
-            timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
-            species=species.get("name") if species else None,
-            common_name=species.get("common_name") if species else None,
-            gpt_confidence=species.get("score") if species else None,
-            spike_score=conf_score,
-            baseline_score=baseline_median,
-            photo_path=photo_path,
-            video_path=video_path,
-            visit_duration=visit_duration,
-        )
+        status = species.get("status", "identified") if species else "unavailable"
+        if status == "identified":
+            send_detection_email(confirmed, conf_score, photo_path, video_path, species)
+            database.log_detection(
+                timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+                species=species.get("name"),
+                common_name=species.get("common_name"),
+                gpt_confidence=species.get("score"),
+                spike_score=conf_score,
+                baseline_score=baseline_median,
+                photo_path=photo_path,
+                video_path=video_path,
+                visit_duration=visit_duration,
+            )
+        elif status == "queued":
+            try:
+                job_id = IdentificationQueue(database.DB_PATH).enqueue({
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "photo_path": species["photo_path"], "video_path": video_path,
+                    "label": confirmed, "spike_score": conf_score,
+                    "baseline_score": baseline_median, "visit_duration": visit_duration,
+                })
+                log.info("Hermes SSH identification queued: %s", job_id[:12])
+            except Exception as error:
+                log.error("Could not enqueue identification (%s); media retained.", type(error).__name__)
+        else:
+            outcome = {"common_name": None, "name": None, "score": None, "source": "local",
+                       **(species or {}), "diagnostic_status": "unknown" if species is None else status}
+            try:
+                if not send_diagnostic_email(confirmed, conf_score, photo_path, video_path, outcome):
+                    log.warning("Final diagnostic email not confirmed; not retried.")
+            except Exception as error:
+                log.error("Final diagnostic email failed (%s); not retried.", type(error).__name__)
+            log.warning("Identification outcome=%s; retaining media without a visitor record: %s",
+                        status, photo_path)
         last_capture = time.time()
 
 except KeyboardInterrupt:

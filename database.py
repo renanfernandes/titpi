@@ -5,6 +5,9 @@ SQLite database for bird feeder detections.
 import sqlite3
 import os
 import json
+import re
+from pathlib import Path
+from contextlib import closing
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 with open(CONFIG_PATH) as _f:
@@ -259,10 +262,53 @@ def get_botd_fallback(date_str):
 
 
 def delete_detection(detection_id):
-    """Delete a detection row by id. Returns True if a row was deleted."""
-    with _connect() as conn:
+    """Delete a visit and its unshared capture media. Missing files are tolerated."""
+    root = Path(_cfg['camera'].get('save_directory', '/home/titpi/titpi/detections')).resolve()
+
+    def media_path(value):
+        if not value:
+            return None
+        path = Path(os.path.abspath(value))
+        if path.parent.resolve() != root or path.suffix.lower() not in {'.jpg', '.jpeg', '.png', '.mp4', '.h264'}:
+            return None
+        return root / path.name
+
+    def capture_stamp(path):
+        match = re.fullmatch(r'[A-Za-z][A-Za-z _-]*_(\d{8}-\d{6})(?:_\d+)?\.(?:jpg|mp4|h264)', path.name)
+        return match.group(1) if match else None
+
+    with closing(_connect()) as conn, conn:
+        conn.execute('BEGIN IMMEDIATE')
+        row = conn.execute('SELECT photo_path, video_path FROM detections WHERE id = ?',
+                           (detection_id,)).fetchone()
+        if row is None:
+            return False
+        paths = {path for value in row if (path := media_path(value)) is not None}
+        references = {path for other in conn.execute(
+            'SELECT photo_path, video_path FROM detections WHERE id != ?', (detection_id,)
+        ) for value in other if (path := media_path(value)) is not None}
+        stamps = {stamp for path in paths if (stamp := capture_stamp(path)) is not None}
+        shared_stamps = {capture_stamp(path) for path in references}
+        for stamp in stamps - shared_stamps:
+            for candidate in root.glob('*' + stamp + '*'):
+                path = media_path(str(candidate))
+                if path is not None and capture_stamp(path) == stamp:
+                    paths.add(path)
+        removed = paths - references
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='identification_jobs'").fetchone():
+            for job in conn.execute("SELECT id, payload FROM identification_jobs WHERE notification='pending'").fetchall():
+                payload = json.loads(job['payload'])
+                if media_path(payload.get('photo_path')) in removed:
+                    conn.execute("UPDATE identification_jobs SET notification='none' WHERE id=? AND notification='pending'",
+                                 (job['id'],))
+        for path in removed:
+            path.unlink(missing_ok=True)
+        for cached in conn.execute('SELECT date, photo_path FROM bird_of_day').fetchall():
+            if media_path(cached['photo_path']) in removed:
+                conn.execute('DELETE FROM bird_of_day WHERE date = ?', (cached['date'],))
+        conn.execute('DELETE FROM bird_of_day WHERE date = (SELECT substr(timestamp, 1, 10) FROM detections WHERE id=?)',
+                     (detection_id,))
         cur = conn.execute("DELETE FROM detections WHERE id = ?", (detection_id,))
-        conn.commit()
     return cur.rowcount > 0
 
 

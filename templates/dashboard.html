@@ -1125,7 +1125,7 @@ setInterval(() => {
 
 // ── Delete & Edit ────────────────────────────────────────────────────────────
 async function deleteDetection(id, btn) {
-  if (!confirm('Delete this detection? This cannot be undone.')) return;
+  if (!confirm('Delete this visit and its photos and video? This permanently removes the media and cannot be undone.')) return;
   btn.disabled = true;
   const r = await fetch(`/api/detection/${id}`, {method:'DELETE'});
   if (r.ok) {
@@ -1265,7 +1265,7 @@ function clearSelection() {
 async function bulkDelete() {
   const ids = getSelectedIds();
   if (!ids.length) return;
-  if (!confirm(`Delete ${ids.length} detection${ids.length !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+  if (!confirm(`Delete ${ids.length} visit${ids.length !== 1 ? 's' : ''} and their photos and videos? This permanently removes the media and cannot be undone.`)) return;
   const r = await fetch('/api/detections/bulk', {
     method: 'DELETE',
     headers: {'Content-Type':'application/json'},

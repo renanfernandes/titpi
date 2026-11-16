@@ -16,7 +16,7 @@
     .brand svg { color:var(--accent); width:25px; height:25px; }
     svg { width:18px; height:18px; flex-shrink:0; }
     a { color:var(--ink); text-decoration:none; }
-    button,input,select { font:inherit; }
+    button,input,select,textarea { font:inherit; }
     button,a,input,select { outline-offset:3px; }
     :focus-visible { outline:2px solid var(--accent); }
     button { cursor:pointer; }
@@ -28,11 +28,19 @@
     h1 { font-size:28px; font-weight:500; margin:0 0 34px; }
     h2 { font-size:17px; font-weight:500; margin:0 0 24px; display:flex; gap:10px; align-items:center; }
     h2 svg { color:var(--accent); }
-    section { border-top:1px solid var(--line); padding-top:26px; }
+    section { border-top:1px solid var(--line); padding-top:26px; margin-bottom:32px; }
     .field { display:grid; grid-template-columns:220px minmax(0,1fr); align-items:center; gap:16px; padding:0 0 24px; }
     label { color:var(--muted); font-size:14px; }
-    input,select { width:100%; min-width:0; background:var(--surface); border:1px solid var(--line); color:var(--ink); border-radius:4px; min-height:42px; padding:9px 12px; }
+    input,select,textarea { width:100%; min-width:0; background:var(--surface); border:1px solid var(--line); color:var(--ink); border-radius:4px; min-height:42px; padding:9px 12px; }
+    textarea { resize:vertical; }
+    input[type="checkbox"] { width:18px; min-height:18px; height:18px; accent-color:var(--accent); }
+    summary { display:flex; align-items:center; gap:10px; cursor:pointer; font-size:17px; font-weight:500; margin-bottom:24px; }
+    summary svg { color:var(--accent); }
+    summary::after { content:'+'; margin-left:auto; color:var(--muted); }
+    details[open] > summary::after { content:'-'; }
+    .field label { overflow-wrap:anywhere; }
     #display-seconds { max-width:140px; }
+    #general-form { margin-bottom:32px; }
     #custom-account { margin-top:10px; }
     .actions { display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end; padding-top:8px; }
     .command { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:42px; border:1px solid var(--line); border-radius:4px; padding:10px 16px; color:var(--ink); background:var(--surface); }
@@ -51,6 +59,54 @@
   </header>
   <main>
     <h1>Settings</h1>
+    <form id="camera-form" hidden>
+      <section>
+        <h2><i data-lucide="camera"></i>Camera</h2>
+        <div class="field"><label for="camera-mode">Camera type</label><select id="camera-mode" required><option value="imx500">AI Camera (IMX500)</option><option value="motion">Camera Module 3 (motion detection)</option></select></div>
+        <div class="actions">
+          <button id="camera-save" class="command primary" type="submit" disabled><i data-lucide="save"></i>Save camera</button>
+          <button id="camera-apply" class="command" type="button" disabled><i data-lucide="rotate-cw"></i>Apply and restart camera</button>
+        </div>
+      </section>
+    </form>
+    <form id="general-form" hidden>
+      <div id="general-fields"></div>
+      <div class="actions"><button id="general-save" class="command primary" type="submit" disabled><i data-lucide="save"></i>Save configuration</button></div>
+    </form>
+    <form id="identification-form" hidden>
+      <section>
+        <h2><i data-lucide="scan-eye"></i>Identification</h2>
+        <div class="field"><label for="local-required">Local classifier (required)</label><input id="local-required" type="checkbox" checked disabled></div>
+        <div class="field"><label for="local-confidence">Local confidence threshold (%)</label><input id="local-confidence" type="number" min="1" max="100" step="any" required></div>
+        <div class="field"><label for="remote-provider">Remote fallback</label><select id="remote-provider"><option value="none">None (local only)</option><option value="hermes_ssh">Hermes SSH (queued)</option><option value="openai">OpenAI API</option><option value="claude">Claude API</option></select></div>
+        <div class="field"><label for="identification-prompt">Bird identification prompt</label><textarea id="identification-prompt" rows="4" maxlength="4000" required></textarea></div>
+        <div data-provider="api" hidden>
+          <div class="field"><label for="remote-timeout">API timeout (seconds)</label><input id="remote-timeout" type="number" min="1" max="60" step="1" required></div>
+          <div class="field"><label for="remote-attempts">API attempts</label><input id="remote-attempts" type="number" min="1" max="3" step="1" required></div>
+        </div>
+        <div data-provider="openai" hidden>
+          <div class="field"><label for="openai-model">OpenAI model</label><input id="openai-model" maxlength="128" autocomplete="off" required></div>
+          <div class="field"><label for="openai-key">OpenAI API key</label><input id="openai-key" type="password" maxlength="1024" autocomplete="new-password" title="Leave empty to preserve the stored key"></div>
+        </div>
+        <div data-provider="hermes_ssh" hidden>
+          <div class="field"><label for="hermes-host">Host IP or hostname</label><input id="hermes-host" maxlength="253" autocomplete="off" required></div>
+          <div class="field"><label for="hermes-user">SSH user</label><input id="hermes-user" maxlength="64" autocomplete="off" required></div>
+          <div class="field"><label for="hermes-key">Private key path on TitPi</label><input id="hermes-key" maxlength="512" autocomplete="off" required></div>
+          <div class="field"><label for="hermes-temp">Temporary directory on remote host</label><input id="hermes-temp" maxlength="512" autocomplete="off" required></div>
+          <div class="field"><label for="hermes-executable">Hermes executable on remote host</label><input id="hermes-executable" maxlength="512" autocomplete="off" required></div>
+          <div class="field"><label for="hermes-connect">Connection timeout (seconds)</label><input id="hermes-connect" type="number" min="1" max="30" step="1" required></div>
+          <div class="field"><label for="hermes-timeout">Total execution timeout (seconds)</label><input id="hermes-timeout" type="number" min="1" max="300" step="1" required></div>
+          <div class="field"><label for="hermes-attempts">Attempts per visit</label><input id="hermes-attempts" type="number" min="1" max="3" step="1" required></div>
+          <div class="field"><label for="hermes-confidence">Species confidence threshold (%)</label><input id="hermes-confidence" type="number" min="1" max="100" step="any" required></div>
+          <div class="field"><label for="hermes-notify-all">Email every Hermes result (diagnostic)</label><input id="hermes-notify-all" type="checkbox"></div>
+        </div>
+        <div data-provider="claude" hidden>
+          <div class="field"><label for="claude-model">Claude model</label><input id="claude-model" maxlength="128" autocomplete="off" required></div>
+          <div class="field"><label for="claude-key">Anthropic API key</label><input id="claude-key" type="password" maxlength="1024" autocomplete="new-password" title="Leave empty to preserve the stored key"></div>
+        </div>
+        <div class="actions"><button id="identification-save" class="command primary" type="submit" disabled><i data-lucide="save"></i>Save identification</button></div>
+      </section>
+    </form>
     <form id="settings-form" hidden>
       <section>
         <h2><i data-lucide="monitor"></i>LED matrix</h2>
@@ -80,12 +136,38 @@
     const saveButton = document.getElementById('save-button');
     const applyButton = document.getElementById('apply-button');
     const reloadButton = document.getElementById('reload-button');
+    const identificationForm = document.getElementById('identification-form');
+    const identificationSave = document.getElementById('identification-save');
+    const remoteProvider = document.getElementById('remote-provider');
+    const cameraForm = document.getElementById('camera-form');
+    const cameraSave = document.getElementById('camera-save');
+    const cameraApply = document.getElementById('camera-apply');
+    const cameraMode = document.getElementById('camera-mode');
+    const generalForm = document.getElementById('general-form');
+    const generalSave = document.getElementById('general-save');
+    let generalVersion = '', generalDirty = false, generalOriginal = {}, generalSchema = {};
+    let cameraVersion = '', cameraDirty = false;
+    let identificationVersion = '', identificationDirty = false;
     let version = '', canRestart = false, dirty = false, busy = false;
     function message(text, error = false) { status.textContent = text; status.classList.toggle('error', error); }
     function updateButtons() {
       saveButton.disabled = busy || !dirty;
-      applyButton.disabled = busy || dirty || !canRestart;
+      identificationSave.disabled = busy || !identificationDirty;
+      cameraSave.disabled = busy || !cameraDirty;
+      generalSave.disabled = busy || !generalDirty;
+      generalForm.querySelectorAll('input').forEach(input => { input.disabled = busy; });
+      cameraMode.disabled = busy;
+      applyButton.disabled = busy || dirty || identificationDirty || cameraDirty || generalDirty || !canRestart;
+      cameraApply.disabled = applyButton.disabled;
       reloadButton.disabled = busy;
+      identificationMode();
+    }
+    function identificationMode() {
+      identificationForm.querySelectorAll('input:not(#local-required),select,textarea').forEach(input => { input.disabled = busy; });
+      identificationForm.querySelectorAll('[data-provider]').forEach(group => {
+        group.hidden = group.dataset.provider === 'api' ? !['openai','claude'].includes(remoteProvider.value) : group.dataset.provider !== remoteProvider.value;
+        group.querySelectorAll('input,textarea').forEach(input => { input.disabled = busy || group.hidden; });
+      });
     }
     function profileMode() { customAccount.hidden = account.value !== 'custom'; customAccount.required = !customAccount.hidden; customAccount.disabled = customAccount.hidden; }
     async function api(path, method = 'GET', body) {
@@ -101,20 +183,164 @@
         throw error;
       } finally { clearTimeout(timer); }
     }
+    function renderGeneral(result) {
+      generalSchema = result.schema;
+      generalOriginal = result.settings;
+      const container = document.getElementById('general-fields');
+      container.replaceChildren();
+      const sections = {email:['Email','mail'], camera:['Capture tuning','sliders-horizontal'], database:['Dashboard and storage','database']};
+      Object.entries(sections).forEach(([section,[title,icon]]) => {
+        const band = document.createElement('section');
+        const details = document.createElement('details');
+        details.open = section === 'email';
+        const heading = document.createElement('summary');
+        const symbol = document.createElement('i'); symbol.dataset.lucide = icon;
+        heading.append(symbol, document.createTextNode(title));
+        details.append(heading); band.append(details); container.append(band);
+        Object.entries(generalSchema[section]).sort(([first],[second]) => Number(second === 'subject_prefix') - Number(first === 'subject_prefix')).forEach(([key,field]) => {
+          const row = document.createElement('div'); row.className = 'field';
+          const input = document.createElement('input');
+          input.id = `general-${section}-${key}`;
+          input.name = `${section}.${key}`;
+          input.dataset.section = section; input.dataset.key = key;
+          input.type = {boolean:'checkbox', integer:'number', number:'number', email:'email', password:'password'}[field.type] || 'text';
+          const label = document.createElement('label'); label.htmlFor = input.id; label.textContent = field.label;
+          if (field.type === 'boolean') input.checked = result.settings[section][key];
+          else if (field.type === 'password') {
+            input.autocomplete = 'new-password';
+            input.placeholder = result.password_configured ? 'Configured' : 'Not configured';
+            input.title = 'Leave empty to preserve the stored password';
+          } else {
+            const value = result.settings[section][key];
+            input.value = field.type === 'list' ? value.join(', ') : value ?? '';
+          }
+          if (field.type === 'list') input.title = 'Comma-separated detection labels';
+          if (field.type === 'path') input.title = 'Absolute path on this Pi; changing it does not move existing files';
+          if (field.optional) input.placeholder = 'Automatic (inside the capture directory)';
+          if (field.min !== undefined) { input.min = field.min; input.max = field.max; input.step = field.type === 'integer' ? '1' : 'any'; }
+          else if (field.type !== 'boolean') input.maxLength = field.max_length || 1024;
+          input.required = !field.optional && !['password','email','boolean'].includes(field.type);
+          row.append(label,input); details.append(row);
+        });
+      });
+      if (window.lucide) lucide.createIcons();
+    }
     async function loadSettings() {
       busy = true; updateButtons(); message('Loading settings...');
       try {
-        const result = await api('/api/settings/lcd');
-        version = result.version; canRestart = result.can_restart; dirty = false;
-        document.getElementById('controller-url').value = result.lcd.url;
-        document.getElementById('display-seconds').value = result.lcd.display_seconds;
-        account.value = ['all','default'].includes(result.lcd.spotify_account) ? result.lcd.spotify_account : 'custom';
-        customAccount.value = account.value === 'custom' ? result.lcd.spotify_account : '';
-        profileMode(); settingsForm.hidden = false; message('');
+        const [matrixRequest, identificationRequest, cameraRequest, generalRequest] = await Promise.allSettled([api('/api/settings/lcd'), api('/api/settings/identification'), api('/api/settings/camera'), api('/api/settings/general')]);
+        const errors = []; canRestart = false; dirty = false; identificationDirty = false; cameraDirty = false; generalDirty = false;
+        generalForm.hidden = generalRequest.status !== 'fulfilled';
+        if (generalRequest.status === 'fulfilled') {
+          const result = generalRequest.value;
+          generalVersion = result.version; canRestart = result.can_restart;
+          renderGeneral(result);
+        } else errors.push(generalRequest.reason.message);
+        cameraForm.hidden = cameraRequest.status !== 'fulfilled';
+        if (cameraRequest.status === 'fulfilled') {
+          const result = cameraRequest.value;
+          cameraVersion = result.version; canRestart = canRestart || result.can_restart;
+          cameraMode.value = result.camera.mode;
+        } else errors.push(cameraRequest.reason.message);
+        settingsForm.hidden = matrixRequest.status !== 'fulfilled';
+        identificationForm.hidden = identificationRequest.status !== 'fulfilled';
+        if (matrixRequest.status === 'fulfilled') {
+          const result = matrixRequest.value;
+          version = result.version; canRestart = canRestart || result.can_restart;
+          document.getElementById('controller-url').value = result.lcd.url;
+          document.getElementById('display-seconds').value = result.lcd.display_seconds;
+          account.value = ['all','default'].includes(result.lcd.spotify_account) ? result.lcd.spotify_account : 'custom';
+          customAccount.value = account.value === 'custom' ? result.lcd.spotify_account : '';
+          profileMode();
+        } else errors.push(matrixRequest.reason.message);
+        if (identificationRequest.status === 'fulfilled') {
+          const result = identificationRequest.value;
+          identificationVersion = result.version; canRestart = canRestart || result.can_restart;
+          remoteProvider.value = result.identification.provider;
+          document.getElementById('hermes-notify-all').checked = result.hermes_ssh.notify_all;
+          const values = {'local-confidence':result.local_classifier.min_confidence * 100,
+            'remote-timeout':result.identification.timeout, 'remote-attempts':result.identification.max_attempts,
+            'identification-prompt':result.identification.prompt,
+            'openai-model':result.openai.model, 'claude-model':result.claude.model,
+            'hermes-host':result.hermes_ssh.host, 'hermes-user':result.hermes_ssh.user,
+            'hermes-key':result.hermes_ssh.key_path, 'hermes-temp':result.hermes_ssh.remote_temp_dir,
+            'hermes-executable':result.hermes_ssh.hermes_path, 'hermes-connect':result.hermes_ssh.connect_timeout,
+            'hermes-timeout':result.hermes_ssh.timeout, 'hermes-attempts':result.hermes_ssh.max_attempts,
+            'hermes-confidence':result.hermes_ssh.min_confidence * 100};
+          Object.entries(values).forEach(([id,value]) => { document.getElementById(id).value = value; });
+          [['openai-key',result.openai.api_key_configured],['claude-key',result.claude.api_key_configured]].forEach(([id,configured]) => {
+            const input = document.getElementById(id); input.value = ''; input.placeholder = configured ? 'Configured' : 'Not configured';
+          });
+        } else errors.push(identificationRequest.reason.message);
+        message(errors.join(' '), errors.length > 0);
       } catch (error) { message(error.message, true); }
       finally { busy = false; updateButtons(); }
     }
     account.addEventListener('change', profileMode);
+    generalForm.addEventListener('input', () => { generalDirty = true; updateButtons(); });
+    generalForm.addEventListener('change', () => { generalDirty = true; updateButtons(); });
+    generalForm.addEventListener('invalid', event => {
+      const details = event.target.closest('details'); if (details) details.open = true;
+    }, true);
+    generalForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const settings = {};
+      generalForm.querySelectorAll('input').forEach(input => {
+        const {section,key} = input.dataset;
+        const field = generalSchema[section][key];
+        const value = field.type === 'boolean' ? input.checked : ['integer','number'].includes(field.type) ? Number(input.value) : field.type === 'list' ? input.value.split(',').map(label => label.trim()).filter(Boolean) : field.type === 'password' ? input.value : input.value.trim();
+        if (field.type === 'password' ? value !== '' : JSON.stringify(value) !== JSON.stringify(generalOriginal[section][key])) {
+          (settings[section] ||= {})[key] = value;
+        }
+      });
+      if (!Object.keys(settings).length) { generalDirty = false; updateButtons(); message('No changes to save.'); return; }
+      if ((settings.camera?.save_directory !== undefined || settings.database?.path !== undefined) && !confirm('Changing storage paths does not move existing photos or database records. Save these paths?')) return;
+      busy = true; updateButtons();
+      try {
+        const result = await api('/api/settings/general', 'PATCH', {version:generalVersion, settings});
+        generalVersion = result.version; cameraVersion = result.version; identificationVersion = result.version;
+        Object.entries(settings).forEach(([section,values]) => Object.assign(generalOriginal[section], values));
+        const password = document.getElementById('general-email-password');
+        if (password.value) password.placeholder = 'Configured'; password.value = '';
+        generalDirty = false;
+        message('Saved. Restart titpi.service, titpi-identification.service and titpi-web.service over SSH to apply all changes.');
+      } catch (error) { message(error.message, true); }
+      finally { busy = false; updateButtons(); }
+    });
+    cameraForm.addEventListener('change', () => { cameraDirty = true; updateButtons(); });
+    cameraForm.addEventListener('submit', async event => {
+      event.preventDefault(); busy = true; updateButtons();
+      try {
+        const result = await api('/api/settings/camera', 'PATCH', {version:cameraVersion, camera:{mode:cameraMode.value}});
+        cameraVersion = result.version; identificationVersion = result.version; generalVersion = result.version; cameraDirty = false;
+        message(canRestart ? 'Camera saved. Apply and restart camera to activate it.' : 'Camera saved. Restart titpi.service over SSH to apply.');
+      } catch (error) { message(error.message, true); }
+      finally { busy = false; updateButtons(); }
+    });
+    identificationForm.addEventListener('input', () => { identificationDirty = true; updateButtons(); });
+    identificationForm.addEventListener('change', () => { identificationDirty = true; updateButtons(); });
+    identificationForm.addEventListener('submit', async event => {
+      event.preventDefault(); busy = true; updateButtons();
+      const value = id => document.getElementById(id).value.trim();
+      try {
+        const body = {version:identificationVersion,
+          identification:{provider:remoteProvider.value, timeout:Number(value('remote-timeout')), max_attempts:Number(value('remote-attempts')), prompt:value('identification-prompt')},
+          local_classifier:{min_confidence:Number(value('local-confidence')) / 100},
+          hermes_ssh:{host:value('hermes-host'), user:value('hermes-user'), key_path:value('hermes-key'),
+            remote_temp_dir:value('hermes-temp'), hermes_path:value('hermes-executable'),
+            connect_timeout:Number(value('hermes-connect')), timeout:Number(value('hermes-timeout')),
+            max_attempts:Number(value('hermes-attempts')), min_confidence:Number(value('hermes-confidence')) / 100,
+            notify_all:document.getElementById('hermes-notify-all').checked},
+          openai:{model:value('openai-model')}, claude:{model:value('claude-model')}};
+        if (value('openai-key')) body.openai.api_key = value('openai-key');
+        if (value('claude-key')) body.claude.api_key = value('claude-key');
+        const result = await api('/api/settings/identification', 'PATCH', body);
+        identificationVersion = result.version; cameraVersion = result.version; generalVersion = result.version; identificationDirty = false;
+        ['openai-key','claude-key'].forEach(id => { const input = document.getElementById(id); if (input.value) input.placeholder = 'Configured'; input.value = ''; });
+        message(canRestart ? 'Saved. Restart the watcher to apply.' : 'Saved. Restart titpi.service over SSH to apply.');
+      } catch (error) { message(error.message, true); }
+      finally { busy = false; updateButtons(); }
+    });
     settingsForm.addEventListener('input', () => { dirty = true; updateButtons(); });
     settingsForm.addEventListener('change', () => { dirty = true; updateButtons(); });
     settingsForm.addEventListener('submit', async event => {
@@ -126,15 +352,17 @@
       } catch (error) { message(error.message, true); }
       finally { busy = false; updateButtons(); }
     });
-    applyButton.addEventListener('click', async () => {
+    async function restartWatcher() {
       if (!confirm('Restart the watcher? Any active recording will be interrupted.')) return;
       busy = true; updateButtons(); message('Restarting watcher...');
       try { await api('/api/settings/restart', 'POST', {}); message('Restart requested. Changes apply when the watcher starts.'); }
       catch (error) { message(error.message, true); }
       finally { busy = false; updateButtons(); }
-    });
-    reloadButton.addEventListener('click', () => { if (!dirty || confirm('Discard unsaved changes and reload settings?')) loadSettings(); });
-    window.addEventListener('beforeunload', event => { if (dirty || busy) { event.preventDefault(); event.returnValue = ''; } });
+    }
+    applyButton.addEventListener('click', restartWatcher);
+    cameraApply.addEventListener('click', restartWatcher);
+    reloadButton.addEventListener('click', () => { if ((!dirty && !identificationDirty && !cameraDirty && !generalDirty) || confirm('Discard unsaved changes and reload settings?')) loadSettings(); });
+    window.addEventListener('beforeunload', event => { if (dirty || identificationDirty || cameraDirty || generalDirty || busy) { event.preventDefault(); event.returnValue = ''; } });
     window.addEventListener('pageshow', event => { if (event.persisted) loadSettings(); });
     loadSettings();
   </script>

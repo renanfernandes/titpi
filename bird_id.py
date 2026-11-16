@@ -1,34 +1,45 @@
 """
-Image identification using local TFLite classifier (primary) and
-GitHub Models API (fallback).
-
-For birds: tries the local AIY bird classifier first, falls back to GPT
-if confidence is low or the model is unavailable.
-For non-birds: uses GPT directly (when identify_all is enabled).
-
-Configuration is loaded from config.json (github section).
-Get a token at: https://github.com/settings/tokens
+Image identification using mandatory local TFLite classification, with an
+explicit optional OpenAI or Claude fallback. Hermes SSH is queued by the watcher.
 """
 
 import os
 import json
-import base64
+import re
 import time
+import base64
+import io
+
 import requests
+from PIL import Image
+
+DEFAULT_PROMPT = (
+    'Examine the attached image carefully. Is a bird visible? If so, identify '
+    'which bird and species it is from visible features, giving its common '
+    'name and scientific name only when supported by the image. Do not assume '
+    'a bird is present or infer a species from the feeder or background. '
+    'If blur, occlusion, or image quality prevents deciding whether a bird is '
+    'present, use inconclusive rather than empty. '
+    'Return ONLY a JSON object with status (empty, identified, inconclusive), '
+    'common_name (string or null), name (Latin binomial or null), category '
+    '(bird or unknown), confidence (0 to 1), and notes. '
+    'Identify birds only; no bird means empty. For identified use category bird. '
+    'If a bird is visible but its species is uncertain, use common_name '
+    '"Unidentified bird" and name null; never invent a scientific name. '
+    'For empty/inconclusive use null names, category unknown and confidence 0.'
+)
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
 with open(CONFIG_PATH) as _f:
     _config = json.load(_f)
-    _gh_config = _config.get("github", {})
     _local_config = _config.get("local_classifier", {})
+    _remote_config = _config.get("identification", {})
 
-GH_TOKEN = _gh_config.get("token", "")
-GH_MODEL = _gh_config.get("model", "gpt-4o-mini")
-GH_ENDPOINT = "https://models.github.ai/inference/chat/completions"
-IDENTIFY_ALL = _gh_config.get("identify_all", True)
+REMOTE_PROVIDER = _remote_config.get("provider", "none")
+REMOTE_ENABLED = REMOTE_PROVIDER in ("openai", "claude")
+REMOTE_QUEUED = REMOTE_PROVIDER == "hermes_ssh"
 
-LOCAL_ENABLED = _local_config.get("enabled", True)
 LOCAL_MIN_CONFIDENCE = _local_config.get("min_confidence", 0.3)
 
 # Species aliases — normalizes model output to canonical names
@@ -63,24 +74,17 @@ def _get_classifier():
                 _bird_classify = bird_classify
             else:
                 _bird_classify = False
-                print("[BIRD_ID] Local classifier model not found, using GPT only.")
+                print("[BIRD_ID] Local classifier model not found; identification unavailable.")
         except ImportError as e:
             _bird_classify = False
-            print(f"[BIRD_ID] Local classifier not available ({e}), using GPT only.")
+            print(f"[BIRD_ID] Local classifier not available ({e}); identification unavailable.")
     return _bird_classify if _bird_classify else None
-
-
-def _is_gpt_configured():
-    return bool(GH_TOKEN)
 
 
 def _try_local(image_path):
     """
     Try local TFLite bird classifier. Returns result dict or None.
     """
-    if not LOCAL_ENABLED:
-        return None
-
     classifier = _get_classifier()
     if not classifier:
         return None
@@ -92,7 +96,7 @@ def _try_local(image_path):
     best = predictions[0]
     if best["score"] < LOCAL_MIN_CONFIDENCE:
         print(f"[BIRD_ID] Local classifier low confidence: "
-              f"{best['name']} ({best['score']:.0%}), falling back to GPT.")
+              f"{best['name']} ({best['score']:.0%}); no reliable local identification.")
         return None
 
     result = {
@@ -108,125 +112,148 @@ def _try_local(image_path):
     return _apply_alias(result)
 
 
-def identify_image(image_path, detected_label="bird", _retry=0):
+def encode_image(image_path):
+    """Return a base64 JPEG bounded to 1280 pixels on its longest side."""
+    if os.path.getsize(image_path) > 10 * 1024 * 1024:
+        raise ValueError("Input image exceeds 10 MB")
+    with Image.open(image_path) as image:
+        if image.width * image.height > 25_000_000:
+            raise ValueError("Input image exceeds 25 megapixels")
+        image.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
+        encoded = io.BytesIO()
+        image.convert("RGB").save(encoded, format="JPEG", quality=85)
+    return base64.b64encode(encoded.getvalue()).decode("ascii")
+
+
+def _remote_outcome(status, source):
+    return {"status": status, "common_name": None, "name": None, "score": 0,
+            "category": "unknown", "source": source}
+
+
+def _parse_remote_result(content, source):
+    data = json.loads(content)
+    if not isinstance(data, dict) or data.get("status") not in ("identified", "empty", "inconclusive"):
+        raise ValueError("Invalid identification status")
+    confidence = data.get("confidence")
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+        raise ValueError("Invalid confidence")
+    if data["status"] != "identified":
+        if data.get("common_name") is not None or data.get("name") is not None or confidence != 0 or data.get("category") != "unknown":
+            raise ValueError("Unresolved frames must not claim species")
+        return _remote_outcome(data["status"], source)
+    common_name = data.get("common_name")
+    category = data.get("category")
+    if not isinstance(common_name, str) or not common_name.strip():
+        raise ValueError("Missing common name")
+    if category != "bird":
+        raise ValueError("Invalid category")
+    name = data.get("name")
+    if not isinstance(name, str) or not re.fullmatch(r"[A-Z][a-z]+ [a-z]+(?: [a-z]+)?", name) or name.casefold() == common_name.casefold():
+        name = "Unknown"
+    return _apply_alias({"status": "identified", "common_name": common_name, "name": name,
+                         "score": float(confidence), "category": category, "source": source})
+
+
+def _try_vision_api(image_path, provider):
+    failure = _remote_outcome("error", provider)
+    settings = _config.get(provider, {})
+    key_variable = "OPENAI_API_KEY" if provider == "openai" else "ANTHROPIC_API_KEY"
+    key = os.environ.get(key_variable) or settings.get("api_key")
+    if not key:
+        print(f"[BIRD_ID] {provider} API key is missing; no request sent.")
+        return failure
+    try:
+        timeout = float(_remote_config.get("timeout", 30))
+        attempts = _remote_config.get("max_attempts", 2)
+        if not 0 < timeout <= 60 or isinstance(attempts, bool) or not isinstance(attempts, int) or not 1 <= attempts <= 3:
+            raise ValueError("Invalid remote timeout/retry settings")
+        image = encode_image(image_path)
+        prompt = _remote_config.get("prompt") or DEFAULT_PROMPT
+        if prompt != DEFAULT_PROMPT:
+            prompt += "\n" + DEFAULT_PROMPT
+        headers = {"Content-Type": "application/json"}
+        if provider == "openai":
+            endpoint = settings.get("endpoint", "https://api.openai.com/v1/chat/completions")
+            headers["Authorization"] = f"Bearer {key}"
+            payload = {"model": settings.get("model") or "gpt-4.1-mini", "max_completion_tokens": 512,
+                       "response_format": {"type": "json_object"},
+                       "messages": [{"role": "user", "content": [
+                           {"type": "text", "text": prompt},
+                           {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image}"}},
+                       ]}]}
+        else:
+            endpoint = settings.get("endpoint", "https://api.anthropic.com/v1/messages")
+            headers.update({"x-api-key": key, "anthropic-version": "2023-06-01"})
+            payload = {"model": settings.get("model") or "claude-haiku-4-5", "max_tokens": 512,
+                       "messages": [{"role": "user", "content": [
+                           {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image}},
+                           {"type": "text", "text": prompt},
+                       ]}]}
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        for attempt in range(attempts):
+            try:
+                response = requests.post(endpoint, data=body, headers=headers,
+                                         timeout=(5, timeout), allow_redirects=False)
+                try:
+                    if response.status_code == 200:
+                        data = response.json()
+                        if provider == "openai":
+                            content = data["choices"][0]["message"]["content"]
+                        else:
+                            content = "".join(block["text"] for block in data["content"] if block.get("type") == "text")
+                        return _parse_remote_result(content, provider)
+                    print(f"[BIRD_ID] {provider} HTTP {response.status_code} (attempt {attempt + 1}/{attempts}).")
+                    if response.status_code not in (408, 429) and not 500 <= response.status_code <= 599:
+                        return failure
+                finally:
+                    response.close()
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as error:
+                print(f"[BIRD_ID] {provider} transport failed ({type(error).__name__}, attempt {attempt + 1}/{attempts}).")
+            if attempt + 1 < attempts:
+                time.sleep(2 ** attempt)
+    except Exception as error:
+        print(f"[BIRD_ID] {provider} identification failed ({type(error).__name__}); media will be retained.")
+    return failure
+
+
+def _try_remote(image_path):
+    if REMOTE_PROVIDER in ("openai", "claude"):
+        return _try_vision_api(image_path, REMOTE_PROVIDER)
+    return None
+
+
+def identify_image(image_path, detected_label="bird", _retry=0, *, local_only=False, return_outcome=False):
     """
     Identify what's in an image.
 
-    For birds: tries local TFLite classifier first, falls back to GPT.
-    For non-birds: uses GPT directly.
+    Always tries local classification, then only the selected remote provider.
 
     Args:
         image_path: path to the image file
         detected_label: what the IMX500 model detected (e.g. 'bird', 'person', 'dog')
+        local_only: return without remote requests when the local model cannot identify it
+        return_outcome: also return empty/inconclusive/error results for the watcher
 
     Returns:
         dict with 'name', 'common_name', 'score' on success
         None if not configured or on failure
     """
-    # Always try local bird classifier first (spike may be any COCO label)
-    local_result = _try_local(image_path)
+    try:
+        local_result = _try_local(image_path)
+    except Exception as error:
+        print(f"[BIRD_ID] Local classifier failed ({type(error).__name__}).")
+        local_result = None
     if local_result:
         return local_result
-
-    # Fall through to GPT if local failed/disabled
-    if not _is_gpt_configured():
-        print("[BIRD_ID] GPT not configured and local classifier didn't match.")
+    if local_only:
         return None
 
-    if not IDENTIFY_ALL and detected_label != "bird":
+    if not REMOTE_ENABLED:
+        print("[BIRD_ID] No local identification; remote identification is disabled.")
         return None
 
-    try:
-        with open(image_path, "rb") as f:
-            image_data = base64.b64encode(f.read()).decode("utf-8")
-
-        prompt = (
-            "Look at this image and identify what animal or person is in it. "
-            f"The camera's AI chip detected it as '{detected_label}', but it may be wrong. "
-            "Respond ONLY with a JSON object (no markdown, no explanation) with these fields:\n"
-            '  "common_name": the common English name (e.g. Red-shouldered Hawk, Domestic Cat, Person),\n'
-            '  "name": the scientific/Latin name (or "Homo sapiens" for person, "Unknown" if unsure),\n'
-            '  "category": one of "bird", "person", "dog", "cat", "other_animal", "unknown",\n'
-            '  "confidence": your confidence from 0.0 to 1.0,\n'
-            '  "notes": a very brief note (max 15 words)\n'
-            "If there is nothing identifiable in the image, return "
-            '{"common_name": null, "name": null, "category": "unknown", "confidence": 0, "notes": "Nothing identifiable"}'
-        )
-
-        resp = requests.post(
-            GH_ENDPOINT,
-            headers={
-                "Authorization": f"Bearer {GH_TOKEN}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": GH_MODEL,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_data}",
-                                },
-                            },
-                        ],
-                    }
-                ],
-                "temperature": 0.1,
-                "max_tokens": 256,
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-
-        text = resp.json()["choices"][0]["message"]["content"]
-        # Strip markdown code fences if present
-        text = text.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1]
-        if text.endswith("```"):
-            text = text.rsplit("```", 1)[0]
-        text = text.strip()
-
-        data = json.loads(text)
-
-        if not data.get("common_name"):
-            print("[BIRD_ID] No bird identified in image.")
-            return None
-
-        result = {
-            "name": data.get("name", "Unknown"),
-            "common_name": data.get("common_name", "Unknown"),
-            "category": data.get("category", detected_label),
-            "score": float(data.get("confidence", 0)),
-            "source": "gpt",
-        }
-
-        notes = data.get("notes", "")
-        print(f"[BIRD_ID] [GPT] {result['common_name']} ({result['name']}) "
-              f"conf={result['score']:.0%} — {notes}")
-
-        return _apply_alias(result)
-
-    except (json.JSONDecodeError, KeyError, IndexError) as e:
-        print(f"[BIRD_ID] Failed to parse response: {e}")
-        return None
-    except requests.exceptions.HTTPError as e:
-        print(f"[BIRD_ID] API error: {e}")
-        if e.response is not None:
-            print(f"[BIRD_ID] Response body: {e.response.text[:500]}")
-            if e.response.status_code == 429 and _retry < 3:
-                wait = 30 * (2 ** _retry)  # 30s, 60s, 120s
-                print(f"[BIRD_ID] Rate limited. Retrying in {wait}s (attempt {_retry+1}/3)...")
-                time.sleep(wait)
-                return identify_image(image_path, detected_label, _retry=_retry+1)
-        return None
-    except Exception as e:
-        print(f"[BIRD_ID] Error: {e}")
-        return None
+    result = _try_remote(image_path)
+    return result if return_outcome or result.get("status") == "identified" else None
 
 
 if __name__ == "__main__":

@@ -40,6 +40,21 @@ if ! ssh_cmd "echo ok" >/dev/null 2>&1; then
 fi
 ok "SSH connected"
 
+if [ -z "$CAMERA_MODE" ]; then
+    info "Checking non-interactive update permissions..."
+    if ! ssh_cmd "sudo -n -l -- install -m 644 '$PI_DIR/services/titpi-identification.service' /etc/systemd/system/titpi-identification.service && \
+                  sudo -n -l -- systemctl daemon-reload && \
+                  sudo -n -l -- systemctl enable titpi-identification.service && \
+                  sudo -n -l -- systemctl restart titpi.service titpi-web.service titpi-identification.service" >/dev/null 2>&1; then
+        echo "ERROR: Cannot verify non-interactive sudo permissions for deployment."
+        echo "No files synced and no services restarted by this run."
+        echo "Ask the Pi administrator to authorize the exact deployment commands,"
+        echo "or perform the privileged steps in an interactive SSH session."
+        echo "See services/README.md: Deployment Sudo Permissions."
+        exit 1
+    fi
+fi
+
 # --- 2. Sync code ---
 info "Syncing code to $PI_HOST:$PI_DIR..."
 rsync -az \
@@ -49,6 +64,7 @@ rsync -az \
     --exclude='*.pyc' \
     --exclude=detections/ \
     --exclude=config.json \
+    --exclude='config.json.*' \
     --exclude=config_lcd.json \
     --exclude='config_lcd.json.*' \
     --exclude='.titpi-settings-*' \
@@ -63,6 +79,10 @@ fi
 
 # If no mode specified, just restart services and exit (update mode)
 if [ -z "$CAMERA_MODE" ]; then
+    info "Validating Python files before restart..."
+    ssh_cmd "cd '$PI_DIR' && python3 -m py_compile bird_id.py watcher.py web.py notifier.py notifier_lcd.py hermes_ssh.py identification_queue.py identification_worker.py"
+    info "Installing persistent identification worker..."
+    ssh_cmd "sudo -n install -m 644 '$PI_DIR/services/titpi-identification.service' /etc/systemd/system/titpi-identification.service && sudo -n systemctl daemon-reload && sudo -n systemctl enable titpi-identification.service"
     info "Update mode — updating web_host in config.json..."
     ssh_cmd "python3 -c \"
 import json, sys
@@ -73,7 +93,7 @@ with open(path, 'w') as f: json.dump(cfg, f, indent=4)
 print('web_host set to $PI_HOST')
 \""
     info "Restarting services..."
-    ssh_cmd "sudo systemctl restart titpi.service titpi-web.service 2>/dev/null || true"
+    ssh_cmd "sudo -n systemctl restart titpi.service titpi-web.service titpi-identification.service && systemctl is-active titpi.service titpi-web.service titpi-identification.service"
     ok "Services restarted. Done!"
     exit 0
 fi
@@ -85,7 +105,7 @@ info "Fresh install (mode=$CAMERA_MODE)..."
 info "Installing system packages..."
 ssh_cmd "sudo apt update -qq && sudo apt install -y -qq \
     python3-picamera2 ffmpeg python3-flask python3-requests \
-    python3-pil python3-numpy python3-libcamera \
+    python3-pil python3-numpy python3-libcamera openssh-client \
     $([ '$CAMERA_MODE' = 'imx500' ] && echo 'imx500-all' || echo '') \
     2>&1 | tail -5"
 ok "System packages installed"
@@ -131,6 +151,7 @@ else
         "motion_min_area": 0.01
     },
     "email": {
+        "subject_prefix": "TitPi",
         "smtp_host": "smtp.gmail.com",
         "smtp_port": 587,
         "from": "",
@@ -142,10 +163,31 @@ else
         "enabled": true,
         "min_confidence": 0.3
     },
-    "github": {
-        "token": "",
-        "model": "gpt-4o-mini",
-        "identify_all": true
+    "identification": {
+        "provider": "none",
+        "timeout": 30,
+        "max_attempts": 2,
+        "prompt": "Examine the attached image carefully. Is a bird visible? If so, identify which bird and species it is from visible features, giving its common name and scientific name only when supported by the image. Do not assume a bird is present or infer a species from the feeder or background. If blur, occlusion, or image quality prevents deciding whether a bird is present, use inconclusive rather than empty. Return ONLY a JSON object with status (empty, identified, inconclusive), common_name (string or null), name (Latin binomial or null), category (bird or unknown), confidence (0 to 1), and notes. Identify birds only; no bird means empty. For identified use category bird. If a bird is visible but its species is uncertain, use common_name \"Unidentified bird\" and name null; never invent a scientific name. For empty/inconclusive use null names, category unknown and confidence 0."
+    },
+    "hermes_ssh": {
+        "host": "10.0.0.3",
+        "user": "renanfernandes",
+        "key_path": "/home/titpi/.ssh/id_ed25519_macmini",
+        "remote_temp_dir": "/tmp",
+        "hermes_path": "/Users/renanfernandes/.local/bin/hermes",
+        "connect_timeout": 10,
+        "timeout": 60,
+        "max_attempts": 1,
+        "min_confidence": 0.7,
+        "notify_all": true
+    },
+    "openai": {
+        "model": "gpt-4.1-mini",
+        "api_key": ""
+    },
+    "claude": {
+        "model": "claude-haiku-4-5",
+        "api_key": ""
     },
     "database": {
         "web_host": "$PI_HOST",
@@ -153,7 +195,7 @@ else
     }
 }
 ENDCONFIG
-    ok "config.json created — edit email/github credentials: ssh $PI_USER@$PI_HOST nano $PI_DIR/config.json"
+    ok "config.json created — edit email and optional provider credentials on the Pi"
 fi
 
 # --- 7. Create directories ---
@@ -168,14 +210,14 @@ ok "Database initialized"
 
 # --- 9. Install systemd services ---
 info "Installing systemd services..."
-ssh_cmd "sudo cp $PI_DIR/services/titpi.service $PI_DIR/services/titpi-web.service $PI_DIR/services/titpi-botd.service $PI_DIR/services/titpi-botd.timer /etc/systemd/system/ && \
+ssh_cmd "sudo cp $PI_DIR/services/titpi.service $PI_DIR/services/titpi-web.service $PI_DIR/services/titpi-identification.service $PI_DIR/services/titpi-botd.service $PI_DIR/services/titpi-botd.timer /etc/systemd/system/ && \
          sudo systemctl daemon-reload && \
-         sudo systemctl enable titpi.service titpi-web.service titpi-botd.timer"
+         sudo systemctl enable titpi.service titpi-web.service titpi-identification.service titpi-botd.timer"
 ok "Systemd services installed and enabled"
 
 # --- 10. Start services ---
 info "Starting services..."
-ssh_cmd "sudo systemctl start titpi.service titpi-web.service titpi-botd.timer"
+ssh_cmd "sudo systemctl start titpi.service titpi-web.service titpi-identification.service titpi-botd.timer"
 ok "Services started"
 
 echo ""
@@ -188,7 +230,4 @@ echo "  Logs:      ssh $PI_USER@$PI_HOST journalctl -u titpi -f"
 echo ""
 if ssh_cmd "grep '\"from\": \"\"' $PI_DIR/config.json" >/dev/null 2>&1; then
     warn "Email credentials not set — edit config.json on the Pi"
-fi
-if ssh_cmd "grep '\"token\": \"\"' $PI_DIR/config.json" >/dev/null 2>&1; then
-    warn "GitHub token not set — edit config.json on the Pi (needed for GPT fallback)"
 fi

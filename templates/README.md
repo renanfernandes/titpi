@@ -4,9 +4,11 @@ HTML templates rendered by `notifier.py` / `notifier_lcd.py`. They use a minimal
 
 ---
 
-## settings.html — Matrix settings
+## settings.html — Complete Per-Pi Settings
 
-Opened by the dashboard's small header gear. This separate Flask page loads matrix URL, Spotify profile selection, and display duration directly, without a password, with separate Save and optional Apply and restart actions. It uses the dashboard's charcoal/green palette and Lucide icons without adding another dashboard tab. Other configuration sections are not editable in this first version. Access is trusted to the internal network; same-origin write checks, validation, backups, and conflict detection remain enabled.
+Opened by the dashboard's small header gear. This separate Flask page includes camera mode, capture tuning, email, dashboard/storage, local/remote identification, and matrix settings without a password. Capture/email/database controls come from the validated `/api/settings/general` schema; email is expanded initially, while advanced capture/storage controls can be expanded. Passwords and API keys are write-only. Only changed general fields are saved, preserving unrelated values and credentials. Blank optional database/log paths restore automatic capture-directory defaults; changing paths does not migrate files. The local classifier remains mandatory and read-only.
+
+Camera type explicitly selects **AI Camera (IMX500)** or **Camera Module 3 (motion detection)**; it is not auto-detected. **Save camera** writes only `camera.mode`. **Apply and restart camera** uses the existing permission-controlled watcher-only restart, with recording-interruption confirmation. General email/storage changes need the watcher, identification worker and web restarted over SSH; saving alone never restarts anything. All restart buttons are blocked while any form has unsaved changes; general, camera and identification saves synchronize their shared JSON version tokens. The existing charcoal/green palette, responsive layout, and Lucide icons are retained. Access is trusted to the internal network; same-origin write checks, validation, backups, and conflict detection remain enabled.
 
 See [service setup](../services/README.md#settings-page-first-time-setup) for LAN access, optional restart permissions, validation, and rollback. The original custom email renderer is not used for this page.
 
@@ -14,7 +16,7 @@ See [service setup](../services/README.md#settings-page-first-time-setup) for LA
 
 Sent on every confirmed detection. Rendered with the following context variables:
 
-The charcoal/green, photo-first email matches the dashboard. Subjects use `TitPi: <common name> stopped by!`, with `TitPi: Someone stopped by!` as the fallback. The body keeps the original camera category and raw detection score in a small diagnostic section, separate from the final identification confidence and source. The watcher passes its confirmed camera label rather than the generic `visitor` label.
+The charcoal/green, photo-first email matches the dashboard. Subjects use `<email.subject_prefix>: <common name> stopped by!`, with `TitPi` as the backward-compatible prefix and an unidentified-visitor fallback. Unpublished Hermes results can use `<prefix>: Hermes diagnostic - <outcome>` while `hermes_ssh.notify_all` is enabled; the body marks that no visitor record was created. The same prefix applies to local/API diagnostic outcomes. Those emails bypass the matrix. The body keeps the original camera category and raw detection score separate from the final identification confidence and source. The watcher passes its confirmed camera label rather than the generic `visitor` label.
 
 The template uses inline styles and presentation tables, including an Outlook fixed-width fallback. Photos remain embedded via `cid:detection_photo`; no external fonts or JavaScript are required. Dynamic fields are HTML-escaped by both notifiers. Browser previews are not a substitute for checking delivery in the actual email client.
 
@@ -24,7 +26,7 @@ The template uses inline styles and presentation tables, including an Outlook fi
 | `species_common_name` | Common name of the identified species (e.g. `House Finch`) |
 | `species_name` | Scientific name (e.g. `Haemorhous mexicanus`) |
 | `confidence_pct` | Identification confidence formatted as percentage (e.g. `87%`) |
-| `source_label` | Source of the ID: `Local model` or `GitHub model` |
+| `source_label` | Source of the ID: `Local model`, `OpenAI`, `Claude` or `Hermes SSH` |
 | `detected_label` | Raw IMX500 COCO label (e.g. `BIRD`) |
 | `detection_score` | Raw IMX500 spike score (e.g. `0.72`) |
 | `video_link` | URL to the video file — only shown if `attach_video` is `false` in config |

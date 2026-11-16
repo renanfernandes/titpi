@@ -26,6 +26,12 @@
   {% endif %}
   <tr>
     <td style="padding:24px 24px 18px; overflow-wrap:anywhere; word-wrap:break-word;">
+      {% if diagnostic_status %}
+      <p style="margin:0 0 14px; color:#a5cfad; font-size:15px; line-height:23px;">Identification diagnostic: {{ diagnostic_status }}. No visitor record created.</p>
+      {% endif %}
+      {% if diagnostic_error %}
+      <p style="margin:0 0 14px; color:#b0bab3; font-size:13px; line-height:21px;">Error: {{ diagnostic_error }}</p>
+      {% endif %}
       {% if species_common_name %}
       <h1 style="margin:0 0 7px; color:#eef1ec; font-size:27px; line-height:35px; font-weight:bold; overflow-wrap:anywhere; word-wrap:break-word;">{{ species_common_name }}</h1>
       <p style="margin:0; color:#b0bab3; font-size:14px; line-height:22px; font-style:italic;">{{ species_name }}</p>
@@ -36,7 +42,7 @@
       <p style="margin:14px 0 0; color:#b0bab3; font-size:13px; line-height:21px;">Identification confidence: <span style="color:#a5cfad;">{{ confidence_pct }}</span></p>
       {% endif %}
       {% if source_label %}
-      <p style="margin:2px 0 0; color:#b0bab3; font-size:13px; line-height:21px;">Identified by {{ source_label }}</p>
+      <p style="margin:2px 0 0; color:#b0bab3; font-size:13px; line-height:21px;">Identification source: {{ source_label }}</p>
       {% endif %}
     </td>
   </tr>

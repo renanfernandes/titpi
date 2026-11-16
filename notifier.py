@@ -21,6 +21,7 @@ EMAIL_FROM = _config.get("from", "")
 EMAIL_PASSWORD = _config.get("password", "")
 EMAIL_TO = _config.get("to", "")
 ATTACH_VIDEO = _config.get("attach_video", True)
+EMAIL_SUBJECT_PREFIX = " ".join(str(_config.get("subject_prefix") or "TitPi").split()) or "TitPi"
 
 with open(CONFIG_PATH) as _wf:
     _web_cfg = json.load(_wf).get("database", {})
@@ -55,11 +56,19 @@ def send_detection_email(label, confidence, image_path=None, video_path=None, sp
         return False
 
     visitor = species.get('common_name') if species else None
-    subject = f"TitPi: {visitor} stopped by!" if visitor else "TitPi: Someone stopped by!"
+    subject = f"{EMAIL_SUBJECT_PREFIX}: {visitor or 'Unidentified visitor'} stopped by!"
+    diagnostic_status = {
+        'unknown': 'Unknown species', 'low_confidence': 'Low confidence',
+        'empty': 'No bird', 'inconclusive': 'Inconclusive', 'error': 'Identification error',
+    }.get(species.get('diagnostic_status')) if species else None
+    if diagnostic_status:
+        diagnostic_source = {'local': 'Local', 'hermes_ssh': 'Hermes', 'openai': 'OpenAI',
+                     'claude': 'Claude'}.get(species.get('source'), 'Identification')
+        subject = f"{EMAIL_SUBJECT_PREFIX}: {diagnostic_source} diagnostic - {diagnostic_status}"
 
     # Build template context
     source = species.get('source', 'unknown') if species else ''
-    source_label = 'Local model' if source == 'local' else 'GitHub model' if source == 'gpt' else source
+    source_label = {'local': 'Local model', 'openai': 'OpenAI', 'claude': 'Claude', 'hermes_ssh': 'Hermes SSH'}.get(source, source)
     video_link = None
     if video_path and not ATTACH_VIDEO:
         video_link = f"http://{WEB_HOST}:{WEB_PORT}/video/{os.path.basename(video_path)}"
@@ -69,12 +78,14 @@ def send_detection_email(label, confidence, image_path=None, video_path=None, sp
         "has_photo": bool(image_path and os.path.exists(image_path)),
         "species_common_name": species['common_name'] if species else "",
         "species_name": species['name'] if species else "",
-        "confidence_pct": f"{species['score']:.0%}" if species else "",
+        "confidence_pct": f"{species['score']:.0%}" if species and species.get('score') is not None else "",
         "source_label": source_label,
         "detected_label": label.upper(),
         "detection_score": f"{confidence:.2f}",
         "video_link": video_link or "",
         "dashboard_link": dashboard_link,
+        "diagnostic_status": diagnostic_status or "",
+        "diagnostic_error": species.get('diagnostic_error', '') if species else '',
     }
 
     # Render HTML
@@ -106,7 +117,7 @@ def send_detection_email(label, confidence, image_path=None, video_path=None, sp
             msg.attach(video)
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
             server.starttls()
             server.login(EMAIL_FROM, EMAIL_PASSWORD)
             server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
